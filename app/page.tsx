@@ -27,7 +27,7 @@ const features = [
     number: "02",
     title: "Shot Studio",
     description:
-      "Break scenes into shots, plan framing and camera movement, and build a clearer path from script to screen.",
+      "Break scenes into shots, plan framing and camera movement, and build a clearer path from script to your screen.",
     icon: Clapperboard,
     color: "text-violet-300",
     background: "bg-violet-400/10",
