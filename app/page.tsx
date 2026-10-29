@@ -1,4 +1,3 @@
-
 import Link from "next/link";
 import {
   ArrowRight,
@@ -7,10 +6,8 @@ import {
   Check,
   Clapperboard,
   Film,
-  Menu,
   Sparkles,
   WandSparkles,
-  X,
   BookOpen,
   Layers3,
   Workflow,
@@ -120,6 +117,7 @@ export default function Home() {
         </nav>
       </header>
 
+      {/* Hero Section */}
       <section className="relative">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_70%_20%,rgba(240,138,75,0.13),transparent_45%)]" />
         <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-5 py-20 md:px-8 md:py-28 lg:grid-cols-[1.05fr_0.95fr] lg:py-32">
@@ -252,10 +250,13 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Features Section */}
       <section id="features" className="scroll-mt-24 border-y border-white/[0.07] bg-[#151513]">
         <div className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
           <div className="max-w-2xl">
-            <p className="mini-label mb-3 text-[#f08a4b]">YOUR CREATIVE TOOLKIT</p>
+            <p className="mb-3 text-[10px] font-bold uppercase tracking-[.18em] text-[#f08a4b]">
+              YOUR CREATIVE TOOLKIT
+            </p>
             <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
               Every part of the process has a place.
             </h2>
@@ -302,11 +303,14 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Workflow Section */}
       <section id="workflow" className="scroll-mt-24">
         <div className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
           <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
             <div>
-              <p className="mini-label mb-3 text-[#f08a4b]">FROM SPARK TO SCREEN</p>
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[.18em] text-[#f08a4b]">
+                FROM SPARK TO SCREEN
+              </p>
               <h2 className="text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">
                 A little more clarity at every step.
               </h2>
@@ -346,12 +350,15 @@ export default function Home() {
         </div>
       </section>
 
+      {/* About CTA Section */}
       <section id="about" className="scroll-mt-24 px-5 pb-20 md:px-8 md:pb-24">
         <div className="relative mx-auto max-w-7xl overflow-hidden rounded-3xl border border-[#4c3a2b] bg-[#211a15] p-7 sm:p-10 lg:p-14">
           <div className="pointer-events-none absolute -right-20 -top-24 h-72 w-72 rounded-full bg-[#f08a4b]/10 blur-3xl" />
           <div className="relative flex flex-col items-start justify-between gap-8 md:flex-row md:items-center">
             <div className="max-w-2xl">
-              <p className="mini-label mb-3 text-[#e8a16e]">MAKE ROOM FOR IDEAS</p>
+              <p className="mb-3 text-[10px] font-bold uppercase tracking-[.18em] text-[#e8a16e]">
+                MAKE ROOM FOR IDEAS
+              </p>
               <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
                 Give your next idea a place to grow.
               </h2>
@@ -372,6 +379,7 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Footer */}
       <footer className="border-t border-white/[0.08]">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-7 text-xs text-[#88847a] sm:flex-row sm:items-center sm:justify-between md:px-8">
           <Link href="/" className="font-semibold text-[#d9d2c6]">
