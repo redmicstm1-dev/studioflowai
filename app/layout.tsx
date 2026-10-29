@@ -1,7 +1,15 @@
-import type { Metadata } from "next";
+
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
-const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+const siteUrl = (
+  process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"
+).replace(/\/+$/, "");
+
+const siteName = "StudioFlow";
+
+const siteDescription =
+  "Plan stories, write scripts, organize shots, maintain creative continuity, and manage production assets in one creative workspace.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -11,41 +19,61 @@ export const metadata: Metadata = {
     template: "%s | StudioFlow",
   },
 
-  description:
-    "Bring your creative projects to life with StudioFlow. Develop ideas, write scripts, organize scenes and shots, maintain continuity, manage assets, and explore voice production in one workspace.",
+  description: siteDescription,
 
-  applicationName: "StudioFlow",
+  applicationName: siteName,
+
+  category: "technology",
 
   keywords: [
+    "StudioFlow",
     "creative production workspace",
     "film production software",
     "screenwriting software",
-    "AI filmmaking tools",
-    "story development",
+    "story development software",
     "shot planning",
+    "film pre-production",
     "film continuity management",
-    "voice production",
+    "creative project management",
+    "production asset management",
   ],
+
+  alternates: {
+    canonical: "/",
+  },
 
   openGraph: {
     type: "website",
-    siteName: "StudioFlow",
+    url: siteUrl,
+    siteName,
     title: "StudioFlow — Creative Production Workspace",
-    description:
-      "Plan stories, develop scripts, organize shots, manage creative assets, and bring productions together in one workspace.",
+    description: siteDescription,
+    locale: "en_US",
   },
 
   twitter: {
     card: "summary_large_image",
     title: "StudioFlow — Creative Production Workspace",
-    description:
-      "One workspace for creative ideas, stories, shots, continuity, assets, and voice production.",
+    description: siteDescription,
   },
 
   robots: {
     index: true,
     follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#0b0b0d",
 };
 
 export default function RootLayout({
