@@ -1,4 +1,3 @@
-
 import { Loader2 } from "lucide-react";
 
 interface LoadingSpinnerProps {
@@ -28,11 +27,11 @@ export default function LoadingSpinner({
     >
       <Loader2
         size={sizes[size]}
-        className="shrink-0 animate-spin text-violet-400"
+        className="shrink-0 animate-spin text-[#f08a4b]"
         aria-hidden="true"
       />
 
-      {label && <span className="text-sm text-slate-400">{label}</span>}
+      {label && <span className="text-sm text-[#a5a39c]">{label}</span>}
 
       {!label && <span className="sr-only">Loading...</span>}
     </div>
@@ -41,7 +40,7 @@ export default function LoadingSpinner({
   if (!fullScreen) return spinner;
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[#080b16]">
+    <div className="flex min-h-screen items-center justify-center bg-[#111110]">
       {spinner}
     </div>
   );
