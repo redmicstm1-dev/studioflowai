@@ -1,4 +1,3 @@
-
 import type { HTMLAttributes } from "react";
 
 type BadgeVariant =
@@ -15,8 +14,8 @@ interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 }
 
 const variants: Record<BadgeVariant, string> = {
-  default: "bg-white/10 text-slate-300 border-white/10",
-  primary: "bg-violet-500/15 text-violet-300 border-violet-500/20",
+  default: "bg-white/10 text-[#a5a39c] border-white/10",
+  primary: "bg-[#f08a4b]/15 text-[#f08a4b] border-[#f08a4b]/20",
   success: "bg-emerald-500/15 text-emerald-300 border-emerald-500/20",
   warning: "bg-amber-500/15 text-amber-300 border-amber-500/20",
   danger: "bg-red-500/15 text-red-300 border-red-500/20",
@@ -24,8 +23,8 @@ const variants: Record<BadgeVariant, string> = {
 };
 
 const dots: Record<BadgeVariant, string> = {
-  default: "bg-slate-400",
-  primary: "bg-violet-400",
+  default: "bg-[#a5a39c]",
+  primary: "bg-[#f08a4b]",
   success: "bg-emerald-400",
   warning: "bg-amber-400",
   danger: "bg-red-400",
