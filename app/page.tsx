@@ -107,7 +107,7 @@ export default function LandingPage() {
             </a>
           </div>
 
-          <Link href="/workspace" className="action-button inline-flex items-center gap-2 text-sm">
+          <Link href="/login" className="action-button inline-flex items-center gap-2 text-sm">
             Open workspace
             <ArrowRight size={16} aria-hidden="true" />
           </Link>
@@ -137,7 +137,7 @@ export default function LandingPage() {
 
             <div className="mt-9 flex flex-col gap-3 sm:flex-row">
               <Link
-                href="/workspace"
+                href="/login"
                 className="action-button inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm font-semibold"
               >
                 Start creating
@@ -283,7 +283,7 @@ export default function LandingPage() {
               <p className="mt-5 max-w-md leading-7 text-[#aaa59b]">
                 Start with the idea you have today. Organize the pieces as your vision becomes clearer. Keep the creative decisions connected instead of scattered across separate tools.
               </p>
-              <Link href="/workspace" className="mt-8 inline-flex items-center gap-2 text-sm font-semibold accent transition hover:opacity-80">
+              <Link href="/login" className="mt-8 inline-flex items-center gap-2 text-sm font-semibold accent transition hover:opacity-80">
                 Explore your workspace <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </div>
@@ -312,7 +312,7 @@ export default function LandingPage() {
             StudioFlow<span className="accent">.</span>
           </Link>
           <p>A creative production workspace for stories, scenes, voices, and ideas.</p>
-          <Link href="/workspace" className="transition hover:text-white">
+          <Link href="/login" className="transition hover:text-white">
             Open workspace <span aria-hidden="true">↗</span>
           </Link>
         </div>
