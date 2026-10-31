@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, type ReactNode } from "react";
@@ -53,7 +52,7 @@ export default function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/75 p-4 backdrop-blur-sm"
       onMouseDown={(event) => {
         if (closeOnOverlayClick && event.target === event.currentTarget) {
           onClose();
@@ -64,13 +63,13 @@ export default function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? "studioflow-modal-title" : undefined}
-        className={`relative my-auto w-full ${sizes[size]} rounded-2xl border border-white/10 bg-[#101525] p-6 shadow-2xl shadow-black/50 sm:p-7`}
+        className={`relative my-auto w-full ${sizes[size]} rounded-2xl border border-[#2b2a27] bg-[#111110] p-6 text-[#f5f2eb] shadow-2xl shadow-black/50 sm:p-7`}
       >
         <button
           type="button"
           onClick={onClose}
           aria-label="Close dialog"
-          className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 transition hover:bg-white/10 hover:text-white"
+          className="absolute right-4 top-4 rounded-xl p-2 text-[#a5a39c] transition hover:bg-white/[0.04] hover:text-[#f5f2eb] focus:outline-none focus:ring-2 focus:ring-[#f08a4b]/30"
         >
           <X size={19} />
         </button>
@@ -80,14 +79,14 @@ export default function Modal({
             {title && (
               <h2
                 id="studioflow-modal-title"
-                className="text-xl font-semibold text-white"
+                className="text-xl font-semibold tracking-tight text-[#f5f2eb]"
               >
                 {title}
               </h2>
             )}
 
             {description && (
-              <p className="mt-2 text-sm leading-6 text-slate-400">
+              <p className="mt-2 text-sm leading-6 text-[#a5a39c]">
                 {description}
               </p>
             )}
