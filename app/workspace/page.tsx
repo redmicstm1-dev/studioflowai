@@ -420,4 +420,95 @@ export default function WorkspacePage() {
             </div>
           </div>
 
-          <div className="mb-9 grid gap-6
+          <div className="mb-9 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
+            <div className="panel overflow-hidden">
+              <div className="flex items-center justify-between border-b border-[#2b2a27] px-5 py-4 md:px-6">
+                <div><h2 className="font-semibold">Pick up where you left off</h2><p className="mt-1 text-xs text-[#8f8b83]">Your creative work, all in one place.</p></div>
+                <button onClick={()=>setActive("My projects")} className="text-xs text-[#e9a477] hover:text-[#ffc39d]">All projects ↗</button>
+              </div>
+              <div className="divide-y divide-[#2b2a27]">
+                {projectList.filter(p=>`${p.title} ${p.type}`.toLowerCase().includes(search.toLowerCase())).slice(0,4).map((p,i)=>(
+                  <button key={`${p.title}-${i}`} onClick={()=>{setActive("My projects");setNotice(`${p.title} selected. Project workspace is the next build step.`)}} className="group flex w-full items-center gap-4 px-5 py-4 text-left hover:bg-white/[.025] md:px-6">
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl" style={{background:`${p.color}20`,color:p.color}}>{p.tag==="FILM"?<Film size={21}/>:<FileText size={21}/>}</div>
+                    <div className="min-w-0 flex-1">
+                      <div className="mb-1 flex items-center gap-2"><span className="truncate text-sm font-medium">{p.title}</span><span className="hidden rounded-md border border-[#393832] px-1.5 py-0.5 text-[9px] tracking-wider text-[#9a968d] sm:inline">{p.tag}</span></div>
+                      <div className="truncate text-xs text-[#8d8981]">{p.type}</div>
+                      <div className="mt-3 h-1 w-full max-w-[260px] overflow-hidden rounded-full bg-[#33322e]"><div className="h-full rounded-full" style={{width:`${p.progress}%`,background:p.color}}/></div>
+                    </div>
+                    <div className="hidden text-right sm:block"><div className="text-xs text-[#aaa69e]">{p.progress}%</div><div className="mt-1 text-[10px] text-[#77746d]">{p.updated}</div></div>
+                    <MoreHorizontal size={18} className="text-[#6e6b64] opacity-0 group-hover:opacity-100"/>
+                  </button>
+                ))}
+              </div>
+            </div>  
+
+            <div className="panel relative overflow-hidden p-5 md:p-6">
+              <div className="absolute -right-14 -top-14 h-48 w-48 rounded-full bg-[#f08a4b]/10 blur-3xl"/>
+              <div className="relative">
+                <div className="mb-5 flex items-center justify-between"><span className="mini-label">YOUR CREATIVE TOOLKIT</span><Sparkles size={17} className="accent"/></div>
+                <h2 className="mb-2 text-xl font-semibold tracking-tight">A little tool for every big idea.</h2>
+                <p className="mb-5 text-xs leading-5 text-[#9e9a91]">Choose a workshop to get moving. Each one is built to work together.</p>
+                <div className="space-y-2">
+                  {tools.map(tool=>(
+                    <button key={tool.name} onClick={()=>setActive(tool.name)} className="flex w-full items-center gap-3 rounded-xl border border-[#302f2a] bg-[#1b1b18]/80 p-3 text-left hover:border-[#51483c] hover:bg-[#22211d]">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{background:`${tool.color}18`,color:tool.color}}><tool.icon size={19}/></div>
+                      <div className="min-w-0 flex-1"><div className="text-sm font-medium">{tool.name}</div><div className="mt-1 truncate text-[11px] text-[#8e8a82]">{tool.desc}</div></div>
+                      <span className="text-[#716e66]">↗</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>  
+
+          <div className="mb-4 flex items-end justify-between">
+            <div><div className="mini-label mb-2">A SMALL FIRST STEP</div><h2 className="text-xl font-semibold tracking-tight">Start with a spark.</h2></div>
+            <span className="hidden text-xs text-[#858178] sm:block">More tools coming into the workshop</span>
+          </div>  
+          
+          <div className="grid gap-4 md:grid-cols-3">
+            <button onClick={()=>setShowCreate(true)} className="panel flex min-h-[150px] flex-col items-start justify-between p-5 text-left hover:border-[#6b4a34]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#f08a4b]/15 text-[#f08a4b]"><Plus size={19}/></div>
+              <div><div className="mb-1 text-sm font-semibold">Start from an idea</div><p className="text-xs leading-5 text-[#8f8b83]">Give a rough idea a place to grow.</p></div>
+            </button>
+            <button onClick={()=>{setActive("Voice Studio");setNotice("Voice Studio is planned for authorized voice samples, character voice profiles, dialogue generation and audio export.")}} className="panel flex min-h-[150px] flex-col items-start justify-between p-5 text-left hover:border-[#3d6557]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#7fc7b2]/15 text-[#7fc7b2]"><Headphones size={19}/></div>
+              <div><div className="mb-1 text-sm font-semibold">Explore Voice Studio</div><p className="text-xs leading-5 text-[#8f8b83]">Plan character voices and script dialogue.</p></div>
+            </button>
+            <button onClick={()=>{setActive("Shot Studio");setNotice("Shot Studio will turn scenes into detailed, continuity-aware shot plans.")}} className="panel flex min-h-[150px] flex-col items-start justify-between p-5 text-left hover:border-[#51436f]">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#b5a1ff]/15 text-[#b5a1ff]"><Clapperboard size={19}/></div>
+              <div><div className="mb-1 text-sm font-semibold">Plan your first scene</div><p className="text-xs leading-5 text-[#8f8b83]">Shape the action, framing and mood.</p></div>
+            </button>
+          </div>  
+          
+          <footer className="mt-10 flex flex-col gap-2 border-t border-[#2b2a27] pt-5 text-[11px] text-[#77746d] sm:flex-row sm:items-center sm:justify-between">
+            <span>StudioFlow · A creative workshop in progress</span>
+            <span className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full bg-[#7fc7a8]"/> Prototype · Your work stays in this browser session</span>
+          </footer>  
+        </div>  
+      </section>  
+
+      {showCreate && (
+        <div role="dialog" aria-modal="true" aria-labelledby="create-title" className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+          <div className="panel w-full max-w-md p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between">
+              <div>
+                <div className="mini-label mb-2">NEW BEGINNINGS</div>
+                <h2 id="create-title" className="text-xl font-semibold">What are we making?</h2>
+                <p className="mt-1 text-sm text-[#9a968d]">Every project starts somewhere.</p>
+              </div>
+              <button aria-label="Close" onClick={()=>setShowCreate(false)} className="rounded-lg p-2 text-[#999] hover:bg-[#2b2a27]"><X size={18}/></button>
+            </div>
+            <label htmlFor="project-name" className="mb-2 block text-xs font-medium text-[#c8c3b8]">Project name</label>
+            <input id="project-name" autoFocus value={projectName} onChange={e=>setProjectName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&createProject()} placeholder="A story, a film, an idea…" className="mb-5 w-full rounded-xl border border-[#3b3934] bg-[#111110] px-4 py-3 text-sm outline-none placeholder:text-[#66635d] focus:border-[#f08a4b]"/>
+            <div className="flex justify-end gap-2">
+              <button onClick={()=>setShowCreate(false)} className="ghost-button text-sm">Cancel</button>
+              <button onClick={createProject} disabled={!projectName.trim()} className="action-button flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"><Plus size={16}/>Create project</button>
+            </div>
+            <p className="mt-4 text-[11px] leading-5 text-[#77746d]">Prototype note: projects currently live in page state and will reset on refresh. Persistent storage comes in a later build phase.</p>
+          </div>
+        </div>
+      )}
+    </main>
+  );
+}
