@@ -1,11 +1,15 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, Eye, EyeOff, Film, Loader2, Lock, Mail, User } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
+
 import { supabase } from "@/lib/supabase";
+import Logo from "@/components/shared/Logo";
+import Button from "@/components/ui/Button";
+import Input from "@/components/ui/Input";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -22,18 +26,26 @@ export default function LoginPage() {
   useEffect(() => {
     if (!supabase) return;
 
+    let active = true;
+
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) router.replace("/workspace");
+      if (active && data.session) {
+        router.replace("/workspace");
+      }
     });
+
+    return () => {
+      active = false;
+    };
   }, [router]);
 
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
     setMessage("");
 
     if (!supabase) {
-      setError("Authentication is not configured. Please check your Supabase environment variables.");
+      setError("Authentication is not configured. Check your Supabase environment variables.");
       return;
     }
 
@@ -55,9 +67,7 @@ export default function LoginPage() {
           email: email.trim(),
           password,
           options: {
-            data: {
-              display_name: name.trim(),
-            },
+            data: { display_name: name.trim() },
           },
         });
 
@@ -67,13 +77,16 @@ export default function LoginPage() {
           router.replace("/workspace");
           router.refresh();
         } else {
-          setMessage("Your account has been created. Check your email for a confirmation link before signing in.");
+          setMessage(
+            "Your account has been created. Check your email for a confirmation link before signing in."
+          );
         }
       } else {
-        const { error: loginError } = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password,
-        });
+        const { error: loginError } =
+          await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
 
         if (loginError) throw loginError;
 
@@ -97,17 +110,9 @@ export default function LoginPage() {
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-blue-700/20 blur-[120px]" />
 
       <div className="relative z-10 w-full max-w-md">
-        <Link
-          href="/"
-          className="mb-10 flex items-center justify-center gap-3"
-        >
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-violet-600 shadow-lg shadow-violet-900/30">
-            <Film size={23} />
-          </div>
-          <span className="text-2xl font-bold tracking-tight">
-            Studio<span className="text-violet-400">Flow</span>
-          </span>
-        </Link>
+        <div className="mb-10 flex justify-center">
+          <Logo size="lg" />
+        </div>
 
         <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-7 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-9">
           <div className="mb-8 text-center">
@@ -127,140 +132,103 @@ export default function LoginPage() {
           </div>
 
           <div className="mb-7 grid grid-cols-2 rounded-xl border border-white/10 bg-black/20 p-1">
-            <button
-              type="button"
-              onClick={() => {
-                setMode("login");
-                setError("");
-                setMessage("");
-              }}
-              className={`rounded-lg py-2.5 text-sm font-semibold transition ${
-                mode === "login"
-                  ? "bg-violet-600 text-white shadow"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Sign in
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setMode("signup");
-                setError("");
-                setMessage("");
-              }}
-              className={`rounded-lg py-2.5 text-sm font-semibold transition ${
-                mode === "signup"
-                  ? "bg-violet-600 text-white shadow"
-                  : "text-slate-400 hover:text-white"
-              }`}
-            >
-              Create account
-            </button>
+            {(["login", "signup"] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => {
+                  setMode(tab);
+                  setError("");
+                  setMessage("");
+                }}
+                className={`rounded-lg py-2.5 text-sm font-semibold transition ${
+                  mode === tab
+                    ? "bg-violet-600 text-white shadow"
+                    : "text-slate-400 hover:text-white"
+                }`}
+              >
+                {tab === "login" ? "Sign in" : "Create account"}
+              </button>
+            ))}
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {mode === "signup" && (
-              <div>
-                <label className="mb-2 block text-sm font-medium text-slate-300">
-                  Your name
-                </label>
-                <div className="relative">
-                  <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Enter your name"
-                    autoComplete="name"
-                    required
-                    className="w-full rounded-xl border border-white/10 bg-black/20 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                  />
-                </div>
-              </div>
+              <Input
+                label="Your name"
+                placeholder="Enter your name"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                autoComplete="name"
+                required
+                leftIcon={<User size={18} />}
+              />
             )}
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
-                Email address
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="you@example.com"
-                  autoComplete="email"
-                  required
-                  className="w-full rounded-xl border border-white/10 bg-black/20 py-3.5 pl-12 pr-4 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                />
-              </div>
-            </div>
+            <Input
+              label="Email address"
+              type="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              autoComplete="email"
+              required
+              leftIcon={<Mail size={18} />}
+            />
 
-            <div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="At least 6 characters"
-                  autoComplete={mode === "login" ? "current-password" : "new-password"}
-                  minLength={6}
-                  required
-                  className="w-full rounded-xl border border-white/10 bg-black/20 py-3.5 pl-12 pr-12 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20"
-                />
-
+            <Input
+              label="Password"
+              type={showPassword ? "text" : "password"}
+              placeholder="At least 6 characters"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              autoComplete={
+                mode === "login" ? "current-password" : "new-password"
+              }
+              minLength={6}
+              required
+              leftIcon={<Lock size={18} />}
+              rightElement={
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                  className="text-slate-500 transition hover:text-white"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
-              </div>
-            </div>
+              }
+            />
 
             {error && (
-              <div role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-300">
+              <div
+                role="alert"
+                className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm leading-6 text-red-300"
+              >
                 {error}
               </div>
             )}
 
             {message && (
-              <div role="status" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-300">
+              <div
+                role="status"
+                className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm leading-6 text-emerald-300"
+              >
                 {message}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-violet-600 px-5 py-3.5 text-sm font-semibold text-white shadow-lg shadow-violet-900/20 transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Please wait...
-                </>
-              ) : (
-                <>
-                  {mode === "login" ? "Sign in to StudioFlow" : "Create my account"}
-                  <ArrowRight size={18} />
-                </>
-              )}
-            </button>
+            <Button type="submit" fullWidth size="lg" loading={loading}>
+              {mode === "login"
+                ? "Sign in to StudioFlow"
+                : "Create my account"}
+              {!loading && <ArrowRight size={18} />}
+            </Button>
           </form>
 
           <p className="mt-7 text-center text-xs leading-6 text-slate-500">
-            By continuing, you agree to use StudioFlow responsibly and keep
-            your account credentials secure.
+            Keep your account credentials secure. By continuing, you agree to
+            use StudioFlow responsibly.
           </p>
         </section>
 
