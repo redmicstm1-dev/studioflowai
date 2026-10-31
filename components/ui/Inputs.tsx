@@ -1,4 +1,3 @@
-
 import {
   forwardRef,
   type InputHTMLAttributes,
@@ -14,7 +13,7 @@ interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   containerClassName?: string;
 }
 
-const Input = forwardRef<HTMLInputElement, InputProps>(
+const Inputs = forwardRef<HTMLInputElement, InputProps>(
   (
     {
       label,
@@ -37,7 +36,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         {label && (
           <label
             htmlFor={inputId}
-            className="mb-2 block text-sm font-medium text-slate-300"
+            className="mb-2 block text-sm font-medium text-[#d4cfc5]"
           >
             {label}
           </label>
@@ -45,7 +44,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
 
         <div className="relative">
           {leftIcon && (
-            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#88847a]">
               {leftIcon}
             </span>
           )}
@@ -58,13 +57,14 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
               error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined
             }
             className={[
-              "min-h-11 w-full rounded-xl border bg-black/20 py-3 text-sm text-white",
-              "outline-none transition placeholder:text-slate-600",
-              "focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20",
+              "min-h-11 w-full rounded-xl bg-[#111110] py-3 text-sm text-[#f5f2eb]",
+              "outline-none ring-0 border border-transparent shadow-none transition duration-200",
+              "placeholder:text-[#6a665e]",
+              "focus:outline-none focus:ring-2 focus:ring-[#f08a4b]/30 focus:border-[#f08a4b]",
               "disabled:cursor-not-allowed disabled:opacity-50",
               error
                 ? "border-red-500/60 focus:border-red-500 focus:ring-red-500/20"
-                : "border-white/10",
+                : "border-transparent hover:border-[#2b2a27]",
               leftIcon ? "pl-11" : "pl-4",
               rightElement ? "pr-11" : "pr-4",
               className,
@@ -75,7 +75,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
           />
 
           {rightElement && (
-            <span className="absolute right-4 top-1/2 -translate-y-1/2">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[#88847a]">
               {rightElement}
             </span>
           )}
@@ -88,7 +88,7 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
         )}
 
         {!error && hint && (
-          <p id={`${inputId}-hint`} className="mt-2 text-xs text-slate-500">
+          <p id={`${inputId}-hint`} className="mt-2 text-xs text-[#88847a]">
             {hint}
           </p>
         )}
@@ -97,6 +97,6 @@ const Input = forwardRef<HTMLInputElement, InputProps>(
   }
 );
 
-Input.displayName = "Input";
+Inputs.displayName = "Inputs";
 
-export default Input;
+export default Inputs;
