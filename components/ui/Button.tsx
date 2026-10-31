@@ -1,4 +1,3 @@
-
 import { forwardRef, type ButtonHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
 
@@ -20,7 +19,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 const variants: Record<ButtonVariant, string> = {
   primary:
-    "bg-violet-600 text-white hover:bg-violet-500 shadow-lg shadow-violet-900/20",
+    "bg-[#f08a4b] text-[#20150f] hover:bg-[#ff9c60] shadow-lg shadow-[#f08a4b]/20",
   secondary:
     "bg-white/10 text-white hover:bg-white/15 border border-white/10",
   outline:
@@ -60,10 +59,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         aria-busy={loading}
         className={[
           "inline-flex items-center justify-center gap-2 rounded-xl",
-          "font-semibold transition duration-200",
+          "font-semibold transition duration-200 cursor-pointer",
           "focus-visible:outline-none focus-visible:ring-2",
-          "focus-visible:ring-violet-500 focus-visible:ring-offset-2",
-          "focus-visible:ring-offset-[#080b16]",
+          "focus-visible:ring-[#f08a4b] focus-visible:ring-offset-2",
+          "focus-visible:ring-offset-[#111110]",
           "disabled:pointer-events-none disabled:opacity-50",
           variants[variant],
           sizes[size],
