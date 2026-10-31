@@ -8,7 +8,7 @@ import { ArrowRight, Eye, EyeOff, Lock, Mail, User } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import Logo from "@/components/shared/Logo";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
+import Inputs from "@/components/ui/Inputs";
 
 export default function LoginPage() {
   const router = useRouter();
