@@ -48,7 +48,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Validation checks BEFORE enabling loading state
     if (mode === "signup" && !name.trim()) {
       setError("Please enter your name.");
       return;
@@ -154,7 +153,7 @@ export default function LoginPage() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             {mode === "signup" && (
-              <Input
+              <Inputs
                 label="Your name"
                 placeholder="Enter your name"
                 value={name}
@@ -165,7 +164,7 @@ export default function LoginPage() {
               />
             )}
 
-            <Input
+            <Inputs
               label="Email address"
               type="email"
               placeholder="you@example.com"
@@ -176,7 +175,7 @@ export default function LoginPage() {
               leftIcon={<Mail size={18} />}
             />
 
-            <Input
+            <Inputs
               label="Password"
               type={showPassword ? "text" : "password"}
               placeholder="At least 6 characters"
