@@ -305,6 +305,34 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* About Section */}
+      <section id="about" className="scroll-mt-24 border-t border-[#2b2a27] bg-[#151513]">
+        <div className="mx-auto max-w-7xl px-5 py-20 md:px-8 md:py-24">
+          <div className="max-w-3xl">
+            <p className="mini-label mb-3">ABOUT STUDIOFLOW</p>
+
+            <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              A connected home for creative production.
+            </h2>
+
+            <p className="mt-5 text-base leading-8 text-[#aaa59b]">
+              StudioFlow is designed to bring the many moving parts of creative
+              production into one organized workspace. From early story development
+              to scene planning, character voices, and production assets, it helps
+              creators keep their ideas and decisions connected as projects evolve.
+            </p>
+
+            <Link
+              href="/login"
+              className="action-button mt-8 inline-flex items-center gap-2 px-6 py-3.5 text-sm font-semibold"
+            >
+              Get started
+              <ArrowRight size={17} aria-hidden="true" />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Footer */}
       <footer className="border-t border-[#2b2a27]">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-7 text-xs text-[#88847a] sm:flex-row sm:items-center sm:justify-between md:px-8">
