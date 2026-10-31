@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
@@ -49,6 +48,12 @@ export default function LoginPage() {
       return;
     }
 
+    // Validation checks BEFORE enabling loading state
+    if (mode === "signup" && !name.trim()) {
+      setError("Please enter your name.");
+      return;
+    }
+
     if (password.length < 6) {
       setError("Your password must contain at least 6 characters.");
       return;
@@ -58,11 +63,6 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        if (!name.trim()) {
-          setError("Please enter your name.");
-          return;
-        }
-
         const { data, error: signupError } = await supabase.auth.signUp({
           email: email.trim(),
           password,
