@@ -104,18 +104,19 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#080b16] px-5 py-12 text-white">
-      <div className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-violet-700/20 blur-[120px]" />
-      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-blue-700/20 blur-[120px]" />
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#111110] px-5 py-12 text-[#f5f2eb]">
+      {/* Glow background using your primary accent color */}
+      <div className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-[#f08a4b]/10 blur-[120px]" />
+      <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-[#f08a4b]/10 blur-[120px]" />
 
       <div className="relative z-10 w-full max-w-md">
         <div className="mb-10 flex justify-center">
           <Logo size="lg" />
         </div>
 
-        <section className="rounded-3xl border border-white/10 bg-white/[0.045] p-7 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-9">
+        <section className="panel p-7 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-9">
           <div className="mb-8 text-center">
-            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.25em] text-violet-400">
+            <p className="mini-label mb-3">
               Your creative workspace
             </p>
 
@@ -123,32 +124,45 @@ export default function LoginPage() {
               {mode === "login" ? "Welcome back" : "Create your account"}
             </h1>
 
-            <p className="mt-3 text-sm leading-6 text-slate-400">
+            <p className="mt-3 text-sm leading-6 text-[#a5a39c]">
               {mode === "login"
                 ? "Sign in to continue building your creative projects."
                 : "Join StudioFlow and bring your creative projects together."}
             </p>
           </div>
 
-          <div className="mb-7 grid grid-cols-2 rounded-xl border border-white/10 bg-black/20 p-1">
-            {(["login", "signup"] as const).map((tab) => (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => {
-                  setMode(tab);
-                  setError("");
-                  setMessage("");
-                }}
-                className={`rounded-lg py-2.5 text-sm font-semibold transition ${
-                  mode === tab
-                    ? "bg-violet-600 text-white shadow"
-                    : "text-slate-400 hover:text-white"
-                }`}
-              >
-                {tab === "login" ? "Sign in" : "Create account"}
-              </button>
-            ))}
+          <div className="mb-7 grid grid-cols-2 rounded-xl border border-[#2b2a27] bg-[#111110] p-1">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setError("");
+                setMessage("");
+              }}
+              className={`rounded-lg py-2.5 text-sm font-semibold transition ${
+                mode === "login"
+                  ? "bg-[#f08a4b] text-[#20150f] shadow"
+                  : "text-[#a5a39c] hover:text-white"
+              }`}
+            >
+              Sign in
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setError("");
+                setMessage("");
+              }}
+              className={`rounded-lg py-2.5 text-sm font-semibold transition ${
+                mode === "signup"
+                  ? "bg-[#f08a4b] text-[#20150f] shadow"
+                  : "text-[#a5a39c] hover:text-white"
+              }`}
+            >
+              Create account
+            </button>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -192,7 +206,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
-                  className="text-slate-500 transition hover:text-white"
+                  className="text-[#a5a39c] transition hover:text-white"
                 >
                   {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
@@ -225,14 +239,14 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="mt-7 text-center text-xs leading-6 text-slate-500">
+          <p className="mt-7 text-center text-xs leading-6 text-[#88847a]">
             Keep your account credentials secure. By continuing, you agree to
             use StudioFlow responsibly.
           </p>
         </section>
 
-        <p className="mt-7 text-center text-sm text-slate-500">
-          <Link href="/" className="transition hover:text-violet-400">
+        <p className="mt-7 text-center text-sm text-[#88847a]">
+          <Link href="/" className="transition hover:text-[#f08a4b]">
             ← Back to StudioFlow
           </Link>
         </p>
