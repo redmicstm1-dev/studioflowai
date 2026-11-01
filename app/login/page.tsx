@@ -38,6 +38,33 @@ export default function LoginPage() {
     };
   }, [router]);
 
+  async function handleGoogleSignIn() {
+    setError("");
+    setMessage("");
+
+    if (!supabase) {
+      setError("Authentication is not configured. Check your Supabase environment variables.");
+      return;
+    }
+
+    try {
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/workspace`,
+        },
+      });
+
+      if (oauthError) throw oauthError;
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not initiate Google sign in. Please try again."
+      );
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -82,11 +109,10 @@ export default function LoginPage() {
           );
         }
       } else {
-        const { error: loginError } =
-          await supabase!.auth.signInWithPassword({
-            email: email.trim(),
-            password,
-          });
+        const { error: loginError } = await supabase!.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
 
         if (loginError) throw loginError;
 
@@ -116,19 +142,51 @@ export default function LoginPage() {
 
         <section className="panel p-7 shadow-2xl shadow-black/40 backdrop-blur-xl sm:p-9">
           <div className="mb-8 text-center">
-            <p className="mini-label mb-3">
-              Your creative workspace
-            </p>
-
+            <p className="mini-label mb-3">Your creative workspace</p>
             <h1 className="text-3xl font-bold tracking-tight">
               {mode === "login" ? "Welcome back" : "Create your account"}
             </h1>
-
             <p className="mt-3 text-sm leading-6 text-[#a5a39c]">
               {mode === "login"
                 ? "Sign in to continue building your creative projects."
                 : "Join StudioFlow and bring your creative projects together."}
             </p>
+          </div>
+
+          {/* Google OAuth Button */}
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            className="mb-6 flex w-full items-center justify-center gap-3 rounded-xl border border-[#2b2a27] bg-[#171715] py-3 text-sm font-medium text-[#f5f2eb] transition duration-200 hover:border-[#3a3934] hover:bg-[#20201d] focus:outline-none focus:ring-2 focus:ring-[#f08a4b]/30"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 24 24">
+              <path
+                fill="#EA4335"
+                d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.8 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.3 8.9 5 12 5z"
+              />
+              <path
+                fill="#4285F4"
+                d="M23.5 12.3c0-.8-.1-1.6-.2-2.3H12v4.5h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.8z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.3 14.7c-.2-.7-.4-1.5-.4-2.7s.2-2 .4-2.7L1.6 6.4C.6 8.4 0 10.6 0 13s.6 4.6 1.6 6.6l3.7-2.9z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.3-6.7-5.3L1.6 15c1.9 3.8 5.8 8 10.4 8z"
+              />
+            </svg>
+            Continue with Google
+          </button>
+
+          <div className="relative mb-6 text-center">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-[#2b2a27]" />
+            </div>
+            <span className="relative bg-[#151513] px-3 text-xs text-[#88847a]">
+              or continue with email
+            </span>
           </div>
 
           <div className="mb-7 grid grid-cols-2 rounded-xl border border-[#2b2a27] bg-[#111110] p-1">
