@@ -1,10 +1,11 @@
 export type Project = {
   id?: string;
-  user_id?: string;
+  owner_id: string;
   title: string;
-  type: string;
-  updated_at?: string;
+  description: string;
+  project_type: string;
+  status: string;
   progress: number;
-  color: string;
-  tag: string;
+  created_at?: string;
+  updated_at?: string;
 };
