@@ -5,15 +5,39 @@ import { Project } from "@/types/project";
 
 interface ProjectListProps {
   projects: Project[];
+  loading?: boolean;
   search: string;
   onSelectProject: (title: string) => void;
 }
 
 export default function ProjectList({
   projects,
+  loading = false,
   search,
   onSelectProject,
 }: ProjectListProps) {
+  // Render skeleton placeholder cards while loading from Supabase
+  if (loading) {
+    return (
+      <div className="divide-y divide-[#2b2a27]">
+        {[1, 2, 3].map((n) => (
+          <div key={n} className="flex animate-pulse items-center gap-4 px-5 py-4 md:px-6">
+            <div className="h-12 w-12 shrink-0 rounded-xl bg-[#23221e]" />
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="h-4 w-1/3 rounded bg-[#23221e]" />
+              <div className="h-3 w-1/2 rounded bg-[#1c1b18]" />
+              <div className="h-1 w-full max-w-[260px] rounded bg-[#1c1b18]" />
+            </div>
+            <div className="hidden space-y-2 text-right sm:block">
+              <div className="ml-auto h-3 w-12 rounded bg-[#23221e]" />
+              <div className="ml-auto h-3 w-16 rounded bg-[#1c1b18]" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   const filtered = projects.filter((p) =>
     `${p.title} ${p.project_type} ${p.description}`
       .toLowerCase()
@@ -23,8 +47,8 @@ export default function ProjectList({
   return (
     <div className="divide-y divide-[#2b2a27]">
       {filtered.length === 0 ? (
-        <div className="px-6 py-8 text-center text-xs text-[#8f8b83]">
-          No projects found. Create your first project to get started!
+        <div className="px-6 py-12 text-center text-xs text-[#8f8b83]">
+          No projects found. Click <strong className="text-[#f08a4b]">Create project</strong> to add your first idea!
         </div>
       ) : (
         filtered.slice(0, 5).map((p, i) => (
