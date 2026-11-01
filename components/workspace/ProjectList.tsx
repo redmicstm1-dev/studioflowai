@@ -15,7 +15,9 @@ export default function ProjectList({
   onSelectProject,
 }: ProjectListProps) {
   const filtered = projects.filter((p) =>
-    `${p.title} ${p.type}`.toLowerCase().includes(search.toLowerCase())
+    `${p.title} ${p.project_type} ${p.description}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
   );
 
   return (
@@ -31,29 +33,30 @@ export default function ProjectList({
             onClick={() => onSelectProject(p.title)}
             className="group flex w-full items-center gap-4 px-5 py-4 text-left transition hover:bg-white/[.025] md:px-6"
           >
-            <div
-              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl"
-              style={{ background: `${p.color}20`, color: p.color }}
-            >
-              {p.tag === "FILM" ? <Film size={21} /> : <FileText size={21} />}
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#f08a4b]/20 text-[#f08a4b]">
+              {p.project_type?.toLowerCase().includes("film") ? (
+                <Film size={21} />
+              ) : (
+                <FileText size={21} />
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <div className="mb-1 flex items-center gap-2">
                 <span className="truncate text-sm font-medium">{p.title}</span>
-                <span className="hidden rounded-md border border-[#393832] px-1.5 py-0.5 text-[9px] tracking-wider text-[#9a968d] sm:inline">
-                  {p.tag}
+                <span className="hidden rounded-md border border-[#393832] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[#9a968d] sm:inline">
+                  {p.project_type}
                 </span>
               </div>
-              <div className="truncate text-xs text-[#8d8981]">{p.type}</div>
+              <div className="truncate text-xs text-[#8d8981]">{p.description}</div>
               <div className="mt-3 h-1 w-full max-w-[260px] overflow-hidden rounded-full bg-[#33322e]">
                 <div
-                  className="h-full rounded-full"
-                  style={{ width: `${p.progress}%`, background: p.color }}
+                  className="h-full rounded-full bg-[#f08a4b]"
+                  style={{ width: `${p.progress}%` }}
                 />
               </div>
             </div>
             <div className="hidden text-right sm:block">
-              <div className="text-xs text-[#aaa69e]">{p.progress}%</div>
+              <div className="text-xs text-[#aaa69e]">{p.status}</div>
               <div className="mt-1 text-[10px] text-[#77746d]">
                 {p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "Just now"}
               </div>
