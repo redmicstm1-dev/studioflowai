@@ -20,6 +20,8 @@ import { supabase } from "@/lib/supabase";
 import Button from "@/components/ui/Button";
 import SidebarNav from "@/components/workspace/SidebarNav";
 import CreateProjectModal from "@/components/workspace/CreateProjectModal";
+import EditProjectModal from "@/components/workspace/EditProjectModal";
+import DeleteProjectModal from "@/components/workspace/DeleteProjectModal";
 import ProjectList from "@/components/workspace/ProjectList";
 import { Project } from "@/types/project";
 
@@ -42,7 +44,12 @@ export default function WorkspacePage() {
 
   const [active, setActive] = useState("Overview");
   const [mobileNav, setMobileNav] = useState(false);
+  
+  // Modals state
   const [showCreate, setShowCreate] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [deletingProject, setDeletingProject] = useState<Project | null>(null);
+
   const [projectList, setProjectList] = useState<Project[]>([]);
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
@@ -79,7 +86,6 @@ export default function WorkspacePage() {
       setUserEmail(user.email || "");
       setCheckingAuth(false);
 
-      // Fetch persistent user projects from Supabase with loading state
       setLoadingProjects(true);
       const { data: dbProjects, error: fetchErr } = await supabase!
         .from("projects")
@@ -265,10 +271,12 @@ export default function WorkspacePage() {
                 projects={projectList}
                 loading={loadingProjects}
                 search={search}
-                onSelectProject={(title) => {
+                onSelectProject={(proj) => {
                   setActive("My projects");
-                  setNotice(`${title} selected.`);
+                  setNotice(`"${proj.title}" selected.`);
                 }}
+                onEditProject={(proj) => setEditingProject(proj)}
+                onDeleteProject={(proj) => setDeletingProject(proj)}
               />
             </div>
 
@@ -304,6 +312,7 @@ export default function WorkspacePage() {
         </div>
       </section>
 
+      {/* Modals */}
       <CreateProjectModal
         isOpen={showCreate}
         onClose={() => setShowCreate(false)}
@@ -311,6 +320,30 @@ export default function WorkspacePage() {
         onProjectCreated={(newProj) => {
           setProjectList([newProj, ...projectList]);
           setNotice(`"${newProj.title}" saved to Supabase!`);
+        }}
+        onError={(err) => setNotice(err)}
+      />
+
+      <EditProjectModal
+        isOpen={!!editingProject}
+        onClose={() => setEditingProject(null)}
+        project={editingProject}
+        onProjectUpdated={(updatedProj) => {
+          setProjectList(
+            projectList.map((p) => (p.id === updatedProj.id ? updatedProj : p))
+          );
+          setNotice(`"${updatedProj.title}" updated successfully!`);
+        }}
+        onError={(err) => setNotice(err)}
+      />
+
+      <DeleteProjectModal
+        isOpen={!!deletingProject}
+        onClose={() => setDeletingProject(null)}
+        project={deletingProject}
+        onProjectDeleted={(deletedId) => {
+          setProjectList(projectList.filter((p) => p.id !== deletedId));
+          setNotice("Project deleted successfully.");
         }}
         onError={(err) => setNotice(err)}
       />
