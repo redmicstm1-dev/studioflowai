@@ -33,13 +33,14 @@ export default function CreateProjectModal({
 
     setLoading(true);
 
-    const newProject: Project = {
-      user_id: userId,
+    // Exact match for non-nullable table columns: owner_id, title, description, project_type, status, progress
+    const newProject: Omit<Project, "id" | "created_at" | "updated_at"> = {
+      owner_id: userId,
       title: projectName.trim(),
-      type: "New creative project",
+      description: "New creative project initialized in workspace.",
+      project_type: "Series",
+      status: "In Progress",
       progress: 0,
-      color: "#f08a4b",
-      tag: "PROJECT",
     };
 
     const { data, error } = await supabase
@@ -51,7 +52,7 @@ export default function CreateProjectModal({
     setLoading(false);
 
     if (error) {
-      onError("Failed to create project in database.");
+      onError("Failed to create project: " + error.message);
       return;
     }
 
