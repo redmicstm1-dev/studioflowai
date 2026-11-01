@@ -62,11 +62,12 @@ export default function LoginPage() {
 
     try {
       if (mode === "signup") {
-        const { data, error: signupError } = await supabase.auth.signUp({
+        const { data, error: signupError } = await supabase!.auth.signUp({
           email: email.trim(),
           password,
           options: {
             data: { display_name: name.trim() },
+            emailRedirectTo: `${window.location.origin}/workspace`,
           },
         });
 
@@ -82,7 +83,7 @@ export default function LoginPage() {
         }
       } else {
         const { error: loginError } =
-          await supabase.auth.signInWithPassword({
+          await supabase!.auth.signInWithPassword({
             email: email.trim(),
             password,
           });
@@ -105,7 +106,6 @@ export default function LoginPage() {
 
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#111110] px-5 py-12 text-[#f5f2eb]">
-      {/* Glow background using your primary accent color */}
       <div className="pointer-events-none absolute -left-40 -top-40 h-96 w-96 rounded-full bg-[#f08a4b]/10 blur-[120px]" />
       <div className="pointer-events-none absolute -bottom-40 -right-40 h-96 w-96 rounded-full bg-[#f08a4b]/10 blur-[120px]" />
 
