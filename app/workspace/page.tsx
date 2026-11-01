@@ -8,13 +8,11 @@ import {
   Boxes,
   Clapperboard,
   FolderOpen,
-  Plus,
   Sparkles,
   Waves,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
-import Button from "@/components/ui/Button";
 import EditProjectModal from "@/components/workspace/EditProjectModal";
 import DeleteProjectModal from "@/components/workspace/DeleteProjectModal";
 import ProjectList from "@/components/workspace/ProjectList";
@@ -27,7 +25,7 @@ const tools = [
   { name: "Asset Library", desc: "References & continuity", icon: Boxes, color: "#e4c66e", route: "/workspace/asset-library" },
 ];
 
-export default function WorkspacePage() {
+export default function WorkspaceOverviewPage() {
   const router = useRouter();
   const [loadingProjects, setLoadingProjects] = useState(true);
 
