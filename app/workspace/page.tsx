@@ -9,7 +9,6 @@ import {
   Boxes,
   Clapperboard,
   FolderOpen,
-  Headphones,
   Menu,
   Plus,
   Search,
@@ -34,6 +33,7 @@ const tools = [
 export default function WorkspacePage() {
   const router = useRouter();
   const [checkingAuth, setCheckingAuth] = useState(true);
+  const [loadingProjects, setLoadingProjects] = useState(true);
   const [authError, setAuthError] = useState("");
 
   const [userId, setUserId] = useState<string>("");
@@ -51,6 +51,7 @@ export default function WorkspacePage() {
     if (!supabase) {
       setAuthError("Supabase is not configured. Check environment variables.");
       setCheckingAuth(false);
+      setLoadingProjects(false);
       return;
     }
 
@@ -76,8 +77,10 @@ export default function WorkspacePage() {
 
       setUserName(displayName);
       setUserEmail(user.email || "");
+      setCheckingAuth(false);
 
-      // Fetch persistent user projects from Supabase
+      // Fetch persistent user projects from Supabase with loading state
+      setLoadingProjects(true);
       const { data: dbProjects, error: fetchErr } = await supabase!
         .from("projects")
         .select("*")
@@ -87,7 +90,7 @@ export default function WorkspacePage() {
         if (!fetchErr && dbProjects) {
           setProjectList(dbProjects);
         }
-        setCheckingAuth(false);
+        setLoadingProjects(false);
       }
     };
 
@@ -230,7 +233,9 @@ export default function WorkspacePage() {
                 <span className="text-sm text-[#aaa69e]">Active projects</span>
                 <FolderOpen size={17} className="text-[#e7a170]" aria-hidden="true" />
               </div>
-              <div className="stat-number">{projectList.length.toString().padStart(2, "0")}</div>
+              <div className="stat-number">
+                {loadingProjects ? "..." : projectList.length.toString().padStart(2, "0")}
+              </div>
             </div>
             <div className="panel p-5">
               <div className="mb-5 flex items-center justify-between">
@@ -258,6 +263,7 @@ export default function WorkspacePage() {
               </div>
               <ProjectList
                 projects={projectList}
+                loading={loadingProjects}
                 search={search}
                 onSelectProject={(title) => {
                   setActive("My projects");
