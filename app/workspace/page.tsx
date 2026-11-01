@@ -15,6 +15,7 @@ import {
   FolderOpen,
   Headphones,
   LayoutDashboard,
+  LogOut,
   Menu,
   Mic2,
   MoreHorizontal,
@@ -80,6 +81,9 @@ export default function WorkspacePage() {
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [authError, setAuthError] = useState("");
 
+  const [userName, setUserName] = useState("Creator");
+  const [userEmail, setUserEmail] = useState("");
+
   const [active, setActive] = useState("Overview");
   const [mobileNav, setMobileNav] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -113,6 +117,16 @@ export default function WorkspacePage() {
         return;
       }
 
+      const user = data.session.user;
+      const displayName =
+        user.user_metadata?.full_name ||
+        user.user_metadata?.display_name ||
+        user.user_metadata?.name ||
+        user.email?.split("@")[0] ||
+        "Creator";
+
+      setUserName(displayName);
+      setUserEmail(user.email || "");
       setCheckingAuth(false);
     };
 
@@ -125,6 +139,16 @@ export default function WorkspacePage() {
 
       if (event === "SIGNED_OUT" || !session) {
         router.replace("/login");
+      } else if (session?.user) {
+        const user = session.user;
+        const displayName =
+          user.user_metadata?.full_name ||
+          user.user_metadata?.display_name ||
+          user.user_metadata?.name ||
+          user.email?.split("@")[0] ||
+          "Creator";
+        setUserName(displayName);
+        setUserEmail(user.email || "");
       }
     });
 
@@ -133,6 +157,20 @@ export default function WorkspacePage() {
       subscription.unsubscribe();
     };
   }, [router]);
+
+  async function handleSignOut() {
+    if (!supabase) return;
+
+    const { error } = await supabase.auth.signOut();
+
+    if (error) {
+      setNotice("Unable to sign out. Please try again.");
+      return;
+    }
+
+    router.replace("/login");
+    router.refresh();
+  }
 
   function createProject(event?: FormEvent) {
     if (event) event.preventDefault();
@@ -302,13 +340,25 @@ export default function WorkspacePage() {
             <CircleHelp size={17} aria-hidden="true" />
             Help & feedback
           </button>
+          <button
+            onClick={handleSignOut}
+            className="nav-item mt-2 w-full text-left transition hover:text-red-400"
+          >
+            <LogOut size={17} aria-hidden="true" />
+            Sign out
+          </button>
           <div className="mt-4 flex items-center gap-3 border-t border-[#2b2a27] px-2 pt-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3a2b23] text-sm font-semibold text-[#f4b38c]">
-              AS
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#3a2b23] text-sm font-semibold uppercase text-[#f4b38c]">
+              {userName
+                .split(" ")
+                .filter(Boolean)
+                .slice(0, 2)
+                .map((part) => part[0])
+                .join("")}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-medium">Austine Stimulate</div>
-              <div className="text-[11px] text-[#928e85]">Creator workspace</div>
+              <div className="truncate text-sm font-medium">{userName}</div>
+              <div className="truncate text-[11px] text-[#928e85]">{userEmail}</div>
             </div>
             <MoreHorizontal size={18} className="text-[#888]" aria-hidden="true" />
           </div>
@@ -377,7 +427,8 @@ export default function WorkspacePage() {
                 <span className="h-1.5 w-1.5 rounded-full bg-[#7fc7a8]" /> YOUR WORKSPACE, YOUR RULES
               </div>
               <h1 className="text-3xl font-semibold tracking-[-.04em] md:text-[38px]">
-                Good to see you, Austine<span className="accent">.</span>
+                Good to see you, {userName.split(" ")[0]}
+                <span className="accent">.</span>
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-6 text-[#a5a198]">
                 Every great thing starts as an idea. What are we making today?
