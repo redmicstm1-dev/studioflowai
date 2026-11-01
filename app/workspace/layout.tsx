@@ -140,6 +140,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
 
   return (
     <main className="min-h-screen bg-[#111110] text-[#f5f2eb]">
+      {/* Sidebar navigation component */}
       <SidebarNav
         active={active}
         setActive={handleNavSelect}
@@ -151,7 +152,9 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         onSignOut={handleSignOut}
       />
 
+      {/* Main content container with correct left margin matching sidebar width */}
       <section className="min-h-screen lg:ml-[248px]">
+        {/* SINGLE Global Header */}
         <header className="sticky top-0 z-30 flex h-[70px] items-center justify-between border-b border-[#2b2a27] bg-[#111110]/90 px-5 backdrop-blur-xl md:px-9">
           <div className="flex items-center gap-3">
             <button
@@ -197,6 +200,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
+        {/* Page children content injected here */}
         <div className="soft-grid mx-auto max-w-[1440px] px-5 py-8 md:px-9 md:py-10">
           {notice && (
             <div className="mb-5 rounded-xl border border-[#3c5b4b] bg-[#1c2b23] px-4 py-3 text-sm text-[#a7dfc0]">
