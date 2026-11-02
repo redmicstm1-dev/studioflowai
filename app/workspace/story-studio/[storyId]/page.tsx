@@ -161,6 +161,6 @@
       setEpTitle("");
       setEpSynopsis("");
       setEpNumber(episodes.length + 2);
-      setNotice("Episode created successfully!");
+      setNotice("Episode create successfully!");
     }
   }
