@@ -13,6 +13,7 @@ export interface ProjectStory {
 export interface ProjectCharacter {
   id: string;
   project_id: string;
+  story_id: string;
   name: string;
   role: string;
   age: string;
@@ -27,6 +28,7 @@ export interface ProjectCharacter {
 export interface ProjectEpisode {
   id: string;
   project_id: string;
+  story_id: string;
   episode_number: number;
   title: string;
   synopsis: string;
@@ -38,6 +40,7 @@ export interface ProjectEpisode {
 export interface ProjectScript {
   id: string;
   project_id: string;
+  story_id: string;
   episode_id: string;
   title: string;
   content: string;
