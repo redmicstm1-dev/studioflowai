@@ -25,16 +25,23 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
 
-  // Determine active section name based on current route
-  const getActiveFromPath = () => {
-    if (pathname.includes("story-studio")) return "Story Studio";
-    if (pathname.includes("shot-studio")) return "Shot Studio";
-    if (pathname.includes("voice-studio")) return "Voice Studio";
-    if (pathname.includes("asset-library")) return "Asset Library";
-    return "Overview";
+  // Dynamically resolve section titles based on active route path
+  const getActiveFromPath = (path: string) => {
+    if (path === "/workspace" || path === "/workspace/") return "Overview";
+    if (path.includes("/workspace/projects/")) return "Project Workstation";
+    if (path.includes("/workspace/projects")) return "My Projects";
+    if (path.includes("/workspace/calendar")) return "Calendar";
+    if (path.includes("/workspace/story-studio")) return "Story Studio";
+    if (path.includes("/workspace/shot-studio")) return "Shot Studio";
+    if (path.includes("/workspace/voice-studio")) return "Voice Studio";
+    if (path.includes("/workspace/asset-library")) return "Asset Library";
+    if (path.includes("/workspace/team")) return "Team & Sharing";
+    if (path.includes("/workspace/settings")) return "Settings";
+    if (path.includes("/workspace/help")) return "Help & Feedback";
+    return "Workspace";
   };
 
-  const active = getActiveFromPath();
+  const active = getActiveFromPath(pathname);
 
   useEffect(() => {
     if (!supabase) {
@@ -92,27 +99,6 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
     router.refresh();
   }
 
-  const handleNavSelect = (name: string) => {
-    switch (name) {
-      case "Story Studio":
-        router.push("/workspace/story-studio");
-        break;
-      case "Shot Studio":
-        router.push("/workspace/shot-studio");
-        break;
-      case "Voice Studio":
-        router.push("/workspace/voice-studio");
-        break;
-      case "Asset Library":
-        router.push("/workspace/asset-library");
-        break;
-      case "Overview":
-      default:
-        router.push("/workspace");
-        break;
-    }
-  };
-
   if (checkingAuth) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#111110] px-5">
@@ -140,10 +126,9 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
 
   return (
     <main className="min-h-screen bg-[#111110] text-[#f5f2eb]">
-      {/* Sidebar navigation component */}
       <SidebarNav
         active={active}
-        setActive={handleNavSelect}
+        setActive={() => {}}
         mobileNav={mobileNav}
         setMobileNav={setMobileNav}
         setShowCreate={setShowCreate}
@@ -152,10 +137,8 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
         onSignOut={handleSignOut}
       />
 
-      {/* Main content container with correct left margin matching sidebar width */}
       <section className="min-h-screen lg:ml-[248px]">
-        {/* SINGLE Global Header */}
-        <header className="sticky top-0 z-30 flex h-[70px] items-center justify-between border-b border-[#2b2a27] bg-[#111110]/90 px-5 backdrop-blur-xl md:px-9">
+        <header className="sticky top-0 z-35 flex h-[70px] items-center justify-between border-b border-[#2b2a27] bg-[#111110]/90 px-5 backdrop-blur-xl md:px-9">
           <div className="flex items-center gap-3">
             <button
               aria-label="Open navigation"
@@ -200,7 +183,6 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        {/* Page children content injected here */}
         <div className="soft-grid mx-auto max-w-[1440px] px-5 py-8 md:px-9 md:py-10">
           {notice && (
             <div className="mb-5 rounded-xl border border-[#3c5b4b] bg-[#1c2b23] px-4 py-3 text-sm text-[#a7dfc0]">
