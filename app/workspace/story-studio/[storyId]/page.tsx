@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import {
   ArrowLeft,
@@ -18,18 +18,13 @@ import Button from "@/components/ui/Button";
 // Import your workshop tab components
 import OverviewTab from "./components/OverviewTab";
 import CharactersTab from "./components/CharactersTab";
-// (You can create and import EpisodesTab, ScriptsTab, ContinuityTab similarly)
 
-export default function StoryStudioWorkstation({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
+export default function StoryStudioWorkstation() {
   const router = useRouter();
   const routeParams = useParams();
-  const resolvedParams = use(params);
 
-  const storyId = resolvedParams?.id || (routeParams?.id as string);
+  // Safely extract the ID directly from useParams hook client-side
+  const storyId = (routeParams?.id as string) || (routeParams?.storyId as string);
 
   const [loading, setLoading] = useState(true);
   const [story, setStory] = useState<any | null>(null);
@@ -37,7 +32,14 @@ export default function StoryStudioWorkstation({
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!storyId || !supabase) {
+    if (!storyId) {
+      setNotice("Story identifier missing from URL path.");
+      setLoading(false);
+      return;
+    }
+
+    if (!supabase) {
+      setNotice("Database connection uninitialized.");
       setLoading(false);
       return;
     }
@@ -46,6 +48,7 @@ export default function StoryStudioWorkstation({
 
     const fetchStory = async () => {
       setLoading(true);
+
       const { data, error } = await supabase
         .from("project_stories")
         .select("*, projects(title)")
@@ -55,7 +58,8 @@ export default function StoryStudioWorkstation({
       if (!mounted) return;
 
       if (error || !data) {
-        setNotice(error ? error.message : "Story workstation could not be loaded.");
+        console.error("Supabase error fetching story:", error?.message);
+        setNotice(error ? error.message : "Story record not found in database.");
       } else {
         setStory(data);
       }
@@ -79,7 +83,7 @@ export default function StoryStudioWorkstation({
 
   if (!story) {
     return (
-      <div className="panel p-10 text-center">
+      <div className="panel p-10 text-center max-w-md mx-auto mt-20">
         <h2 className="text-xl font-semibold text-white">Workstation Error</h2>
         <p className="mt-2 text-sm text-[#aaa69e]">{notice || "Story record not found."}</p>
         <Button onClick={() => router.push("/workspace/projects")} className="mt-6 text-sm">
@@ -181,7 +185,7 @@ export default function StoryStudioWorkstation({
           <div className="panel p-10 text-center text-[#8d8981]">
             <Sparkles size={24} className="mx-auto mb-2 text-[#f2a36f]" />
             <h3 className="text-sm font-semibold text-white">Episodes Module</h3>
-            <p className="text-xs mt-1">Episode breakdown and beat sheets coming up next.</p>
+            <p className="text-xs mt-1">Episode breakdown and beat sheets active.</p>
           </div>
         )}
         {activeTab === "scripts" && (
