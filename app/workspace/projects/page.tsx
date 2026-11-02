@@ -2,12 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FolderOpen, Search } from "lucide-react";
+import { FolderOpen, Search, Plus } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import ProjectList from "@/components/workspace/ProjectList";
 import EditProjectModal from "@/components/workspace/EditProjectModal";
 import DeleteProjectModal from "@/components/workspace/DeleteProjectModal";
+import CreateProjectModal from "@/components/workspace/CreateProjectModal";
+import Button from "@/components/ui/Button";
 import { Project } from "@/types/project";
 
 export default function MyProjectsPage() {
@@ -16,7 +18,9 @@ export default function MyProjectsPage() {
   const [projectList, setProjectList] = useState<Project[]>([]);
   const [search, setSearch] = useState("");
   const [notice, setNotice] = useState("");
+  const [currentUserId, setCurrentUserId] = useState<string>("");
 
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
@@ -25,9 +29,16 @@ export default function MyProjectsPage() {
 
     let mounted = true;
 
-    const fetchProjects = async () => {
+    const fetchUserAndProjects = async () => {
       setLoading(true);
-      const { data, error } = await supabase!
+
+      // Get authenticated user ID for creating entries securely
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user && mounted) {
+        setCurrentUserId(user.id);
+      }
+
+      const { data, error } = await supabase
         .from("projects")
         .select("*")
         .order("created_at", { ascending: false });
@@ -40,7 +51,7 @@ export default function MyProjectsPage() {
       }
     };
 
-    fetchProjects();
+    fetchUserAndProjects();
 
     return () => {
       mounted = false;
@@ -61,6 +72,12 @@ export default function MyProjectsPage() {
             Manage, edit, and organize all your active creative workspaces.
           </p>
         </div>
+        <Button
+          onClick={() => setIsCreateOpen(true)}
+          className="action-button flex items-center gap-2 text-sm"
+        >
+          <Plus size={16} /> Create Project
+        </Button>
       </div>
 
       {notice && (
@@ -70,13 +87,13 @@ export default function MyProjectsPage() {
       )}
 
       <div className="mb-6 flex items-center justify-between gap-4">
-        <label className="flex items-center gap-2 rounded-xl border border-[#33322e] bg-[#191917] px-3 py-2">
+        <label className="flex items-center gap-2 rounded-xl border border-[#33322e] bg-[#191917] px-3 py-2 w-full max-w-sm">
           <Search size={15} className="text-[#8b887f]" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search projects..."
-            className="bg-transparent text-xs outline-none placeholder:text-[#77746d]"
+            className="bg-transparent text-xs outline-none placeholder:text-[#77746d] w-full"
           />
         </label>
       </div>
@@ -93,6 +110,17 @@ export default function MyProjectsPage() {
           onDeleteProject={(proj) => setDeletingProject(proj)}
         />
       </div>
+
+      <CreateProjectModal
+        isOpen={isCreateOpen}
+        onClose={() => setIsCreateOpen(false)}
+        userId={currentUserId}
+        onProjectCreated={(newProj) => {
+          setProjectList([newProj, ...projectList]);
+          setNotice(`"${newProj.title}" created successfully!`);
+        }}
+        onError={(err) => setNotice(err)}
+      />
 
       <EditProjectModal
         isOpen={!!editingProject}
