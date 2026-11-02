@@ -33,13 +33,12 @@ export default function CreateProjectModal({
 
     setLoading(true);
 
-    // Exact match for non-nullable table columns: owner_id, title, description, project_type, status, progress
     const newProject: Omit<Project, "id" | "created_at" | "updated_at"> = {
       owner_id: userId,
       title: projectName.trim(),
       description: "New creative project initialized in workspace.",
-      project_type: "Series",
-      status: "In Progress",
+      project_type: "series", // Lowercase matches database check constraints
+      status: "development",  // Lowercase matches standard database constraints
       progress: 0,
     };
 
