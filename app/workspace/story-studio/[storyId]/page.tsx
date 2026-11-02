@@ -535,3 +535,41 @@ export default function StoryWorkspacePage({
                     onChange={(e) => setEpNumber(parseInt(e.target.value) || 1)}
                     required
                     className="w-full rounded-xl border border-[#33322e] bg-[#121210] px-3 py-2 text-xs text-white outline-none"
+                  />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-[#aaa69e] mb-1">Title *</label>
+                  <input
+                    type="text"
+                    value={epTitle}
+                    onChange={(e) => setEpTitle(e.target.value)}
+                    required
+                    placeholder="The Awakening"
+                    className="w-full rounded-xl border border-[#33322e] bg-[#121210] px-3 py-2 text-xs text-white outline-none"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#aaa69e] mb-1">Synopsis</label>
+                <textarea
+                  value={epSynopsis}
+                  onChange={(e) => setEpSynopsis(e.target.value)}
+                  rows={3}
+                  className="w-full rounded-xl border border-[#33322e] bg-[#121210] px-3 py-2 text-xs text-white outline-none resize-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" onClick={() => setShowEpModal(false)} variant="secondary" size="sm">
+                  Cancel
+                </Button>
+                <Button type="submit" size="sm" className="action-button">
+                  Save Episode
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
