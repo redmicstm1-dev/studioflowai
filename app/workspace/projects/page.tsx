@@ -20,13 +20,11 @@ import { ProjectStory } from "@/types/story";
 export default function SingleProjectPage({
   params,
 }: {
-  params: Promise<{ projectId?: string; id?: string }>;
+  params: Promise<{ id: string }>;
 }) {
   const resolvedParams = use(params);
   const router = useRouter();
-  
-  // Safely fallback to whichever parameter name Next.js assigns based on folder structure
-  const projectId = resolvedParams?.projectId || resolvedParams?.id;
+  const projectId = resolvedParams?.id;
 
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
@@ -42,6 +40,7 @@ export default function SingleProjectPage({
 
   useEffect(() => {
     if (!supabase || !projectId) {
+      setNotice("Project identifier missing.");
       setLoading(false);
       return;
     }
@@ -51,7 +50,7 @@ export default function SingleProjectPage({
     const fetchProjectDetails = async () => {
       setLoading(true);
 
-      // 1. Fetch Project Record
+      // 1. Fetch Project Record by ID
       const { data: projData, error: projError } = await supabase!
         .from("projects")
         .select("*")
@@ -61,25 +60,28 @@ export default function SingleProjectPage({
       if (!mounted) return;
 
       if (projError || !projData) {
-        setNotice("Project not found or access denied.");
+        setNotice(projError ? projError.message : "Project record could not be loaded.");
         setLoading(false);
         return;
       }
 
       setProject(projData);
 
-      // 2. Fetch Stories linked to this specific Project
-      const { data: storyData } = await supabase!
+      // 2. Fetch Stories linked to this specific Project ID
+      const { data: storyData, error: storyError } = await supabase!
         .from("project_stories")
         .select("*")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
 
-      if (storyData && mounted) {
-        setStories(storyData);
+      if (mounted) {
+        if (storyError) {
+          console.error("Error fetching stories:", storyError.message);
+        } else if (storyData) {
+          setStories(storyData);
+        }
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchProjectDetails();
@@ -109,17 +111,20 @@ export default function SingleProjectPage({
       .select()
       .single();
 
+    setCreating(false);
+
     if (error) {
       setNotice(`Error creating story: ${error.message}`);
-      setCreating(false);
-    } else if (data) {
+      return;
+    }
+
+    if (data) {
       setStories([data, ...stories]);
-      setNotice(`Story "${data.title}" added successfully!`);
+      setNotice(`Story "${data.title}" added to project!`);
       setShowCreateModal(false);
       setNewStoryTitle("");
       setNewStoryLogline("");
       setNewStoryGenre("");
-      setCreating(false);
     }
   }
 
