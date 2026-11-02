@@ -35,7 +35,7 @@ export default function StoryStudioLibraryPage() {
     const fetchData = async () => {
       setLoading(true);
 
-      // Fetch user projects
+      // 1. Fetch user projects
       const { data: projData, error: projError } = await supabase!
         .from("projects")
         .select("*")
@@ -54,7 +54,7 @@ export default function StoryStudioLibraryPage() {
         setNewStoryProjectId(projData[0].id);
       }
 
-      // Fetch all stories across projects
+      // 2. Fetch all stories across projects
       const { data: storyData, error: storyError } = await supabase!
         .from("project_stories")
         .select("*")
@@ -89,7 +89,7 @@ export default function StoryStudioLibraryPage() {
     setCreating(true);
     setNotice("");
 
-    const { data, error } = await supabase
+    const { data, error } = await supabase!
       .from("project_stories")
       .insert([
         {
@@ -125,8 +125,8 @@ export default function StoryStudioLibraryPage() {
   const filteredStories = stories.filter((story) => {
     const matchesSearch =
       story.title.toLowerCase().includes(search.toLowerCase()) ||
-      story.genre.toLowerCase().includes(search.toLowerCase()) ||
-      story.logline?.toLowerCase().includes(search.toLowerCase());
+      (story.genre && story.genre.toLowerCase().includes(search.toLowerCase())) ||
+      (story.logline && story.logline.toLowerCase().includes(search.toLowerCase()));
 
     const matchesProject =
       selectedProjectFilter === "all" || story.project_id === selectedProjectFilter;
@@ -141,7 +141,7 @@ export default function StoryStudioLibraryPage() {
           <div className="mb-3 flex items-center gap-2 text-xs text-[#f2a36f]">
             <BookOpen size={15} /> STORY STUDIO LIBRARY
           </div>
-          <h1 className="text-3xl font-semibold tracking-[-.04em] md:text-[38px]">
+          <h1 className="text-3xl font-semibold tracking-[-.04em] md:text-[38px] text-white">
             Narratives & Concepts<span className="accent">.</span>
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-[#a5a198]">
@@ -170,7 +170,7 @@ export default function StoryStudioLibraryPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search stories, genres..."
-            className="w-full bg-transparent text-xs outline-none placeholder:text-[#77746d]"
+            className="w-full bg-transparent text-xs outline-none placeholder:text-[#77746d] text-white"
           />
         </label>
 
@@ -203,7 +203,7 @@ export default function StoryStudioLibraryPage() {
           <h3 className="text-lg font-semibold text-white">No stories found</h3>
           <p className="mt-2 text-xs leading-6 text-[#8d8981] max-w-md mx-auto">
             {stories.length === 0
-              ? "Get started by creating your first story concept and linking it to a project."
+              ? "Get started by creating your first story concept or creating a project."
               : "No stories match your current search or project filter criteria."}
           </p>
           {stories.length === 0 && (
@@ -220,7 +220,7 @@ export default function StoryStudioLibraryPage() {
           {filteredStories.map((story) => (
             <div
               key={story.id}
-              onClick={() => router.push(`/workspace/projects/${story.project_id}`)}
+              onClick={() => router.push(`/workspace/story-studio/${story.id}`)}
               className="panel group relative cursor-pointer p-6 transition hover:border-[#51483c] hover:bg-[#1a1a17]"
             >
               <div className="mb-4 flex items-center justify-between">
@@ -240,10 +240,10 @@ export default function StoryStudioLibraryPage() {
               </p>
 
               <div className="mt-6 flex items-center justify-between border-t border-[#252421] pt-4 text-xs text-[#8d8981]">
-                <span className="flex items-center gap-1.5">
-                  <FolderOpen size={14} className="text-[#e7a170]" /> Open Workstation
+                <span className="flex items-center gap-1.5 text-[#f2a36f]">
+                  <FolderOpen size={14} /> Open Workstation
                 </span>
-                <ArrowRight size={15} className="transition-transform group-hover:translate-x-1" />
+                <ArrowRight size={15} className="transition-transform group-hover:translate-x-1 text-[#8d8981]" />
               </div>
             </div>
           ))}
