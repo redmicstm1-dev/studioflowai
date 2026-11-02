@@ -32,7 +32,7 @@ export interface ProjectEpisode {
   episode_number: number;
   title: string;
   synopsis: string;
-  status: 'draft' | 'in_progress' | 'completed';
+  status: "draft" | "in_progress" | "completed";
   created_at: string;
   updated_at: string;
 }
