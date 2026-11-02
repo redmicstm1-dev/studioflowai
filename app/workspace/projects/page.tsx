@@ -10,7 +10,6 @@ import {
   Sparkles,
   ArrowRight,
   Clock,
-  Layers,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
@@ -25,14 +24,16 @@ export default function SingleProjectPage({
 }) {
   const resolvedParams = use(params);
   const router = useRouter();
-  const projectId = resolvedParams.projectId || resolvedParams.id;
+  
+  // Safely fallback to whichever parameter name Next.js assigns based on folder structure
+  const projectId = resolvedParams?.projectId || resolvedParams?.id;
 
   const [loading, setLoading] = useState(true);
   const [project, setProject] = useState<Project | null>(null);
   const [stories, setStories] = useState<ProjectStory[]>([]);
   const [notice, setNotice] = useState("");
 
-  // Create Story Modal state inside Project workspace
+  // Create Story Modal state
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newStoryTitle, setNewStoryTitle] = useState("");
   const [newStoryLogline, setNewStoryLogline] = useState("");
@@ -113,7 +114,7 @@ export default function SingleProjectPage({
       setCreating(false);
     } else if (data) {
       setStories([data, ...stories]);
-      setNotice(`Story "${data.title}" added to project!`);
+      setNotice(`Story "${data.title}" added successfully!`);
       setShowCreateModal(false);
       setNewStoryTitle("");
       setNewStoryLogline("");
@@ -151,7 +152,7 @@ export default function SingleProjectPage({
         <ArrowLeft size={16} /> Back to Projects
       </button>
 
-      {/* Project Banner Header */}
+      {/* Project Header */}
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <div className="mb-2 flex items-center gap-2">
@@ -185,7 +186,7 @@ export default function SingleProjectPage({
         </div>
       )}
 
-      {/* Linked Story Studio Workspaces */}
+      {/* Linked Story Workspaces */}
       <div className="mt-10">
         <div className="mb-6 flex items-center justify-between border-b border-[#2b2a27] pb-4">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
@@ -198,7 +199,7 @@ export default function SingleProjectPage({
             <Sparkles size={32} className="mx-auto mb-3 text-[#f2a36f]" />
             <h3 className="text-base font-semibold text-white">No Story Concepts Initialized</h3>
             <p className="mt-1 text-xs text-[#8d8981] max-w-sm mx-auto">
-              Create a narrative arc for this project to start building characters, episodes, and screenplays.
+              Create a narrative arc for this project to start building characters and episodes.
             </p>
             <Button
               onClick={() => setShowCreateModal(true)}
@@ -243,7 +244,7 @@ export default function SingleProjectPage({
         )}
       </div>
 
-      {/* Modal for creating a story within this specific project */}
+      {/* Modal for adding a story */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="panel w-full max-w-lg p-6 bg-[#181815]">
@@ -261,7 +262,7 @@ export default function SingleProjectPage({
                   type="text"
                   value={newStoryTitle}
                   onChange={(e) => setNewStoryTitle(e.target.value)}
-                  placeholder="e.g., Season 1 Narrative"
+                  placeholder="e.g., Act I: Awakening"
                   required
                   className="w-full rounded-xl border border-[#33322e] bg-[#121210] px-3 py-2.5 text-xs text-white outline-none placeholder:text-[#666]"
                 />
@@ -287,7 +288,7 @@ export default function SingleProjectPage({
                 <textarea
                   value={newStoryLogline}
                   onChange={(e) => setNewStoryLogline(e.target.value)}
-                  placeholder="One sentence story hook..."
+                  placeholder="One sentence summary..."
                   rows={3}
                   className="w-full rounded-xl border border-[#33322e] bg-[#121210] px-3 py-2.5 text-xs text-white outline-none placeholder:text-[#666] resize-none"
                 />
