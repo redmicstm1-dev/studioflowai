@@ -40,6 +40,7 @@ export default function SingleProjectPage({
 
   useEffect(() => {
     if (!supabase || !projectId) {
+      setNotice("Project identifier missing.");
       setLoading(false);
       return;
     }
@@ -49,7 +50,7 @@ export default function SingleProjectPage({
     const fetchProjectDetails = async () => {
       setLoading(true);
 
-      // 1. Fetch Project Record
+      // 1. Fetch Project Record by ID
       const { data: projData, error: projError } = await supabase!
         .from("projects")
         .select("*")
@@ -66,18 +67,21 @@ export default function SingleProjectPage({
 
       setProject(projData);
 
-      // 2. Fetch Stories linked to this project
-      const { data: storyData } = await supabase!
+      // 2. Fetch Stories linked to this specific Project ID
+      const { data: storyData, error: storyError } = await supabase!
         .from("project_stories")
         .select("*")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
 
-      if (storyData && mounted) {
-        setStories(storyData);
+      if (mounted) {
+        if (storyError) {
+          console.error("Error fetching stories:", storyError.message);
+        } else if (storyData) {
+          setStories(storyData);
+        }
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     fetchProjectDetails();
@@ -107,17 +111,20 @@ export default function SingleProjectPage({
       .select()
       .single();
 
+    setCreating(false);
+
     if (error) {
       setNotice(`Error creating story: ${error.message}`);
-      setCreating(false);
-    } else if (data) {
+      return;
+    }
+
+    if (data) {
       setStories([data, ...stories]);
       setNotice(`Story "${data.title}" added to project!`);
       setShowCreateModal(false);
       setNewStoryTitle("");
       setNewStoryLogline("");
       setNewStoryGenre("");
-      setCreating(false);
     }
   }
 
@@ -242,7 +249,7 @@ export default function SingleProjectPage({
         )}
       </div>
 
-      {/* Modal for adding a story to this specific project */}
+      {/* Modal for adding a story */}
       {showCreateModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
           <div className="panel w-full max-w-lg p-6 bg-[#181815]">
