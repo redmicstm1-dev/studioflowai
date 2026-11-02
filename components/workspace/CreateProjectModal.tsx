@@ -42,24 +42,38 @@ export default function CreateProjectModal({
       progress: 0,
     };
 
-    const { data, error } = await supabase
+    // 1. Insert Project Record
+    const { data: projectData, error: projectError } = await supabase
       .from("projects")
       .insert([newProject])
       .select()
       .single();
 
-    setLoading(false);
-
-    if (error) {
-      onError("Failed to create project: " + error.message);
+    if (projectError || !projectData) {
+      setLoading(false);
+      onError("Failed to create project: " + projectError?.message);
       return;
     }
 
-    if (data) {
-      onProjectCreated(data);
-      setProjectName("");
-      onClose();
+    // 2. Automatically seed an initial Story Studio narrative workspace for this project
+    const { error: storyError } = await supabase.from("project_stories").insert([
+      {
+        project_id: projectData.id,
+        title: `${projectData.title} - Main Narrative`,
+        logline: "Initial story workspace concept.",
+        genre: "Drama",
+      },
+    ]);
+
+    setLoading(false);
+
+    if (storyError) {
+      console.warn("Project created, but failed to auto-seed initial story studio:", storyError.message);
     }
+
+    onProjectCreated(projectData);
+    setProjectName("");
+    onClose();
   }
 
   return (
