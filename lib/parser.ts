@@ -43,7 +43,8 @@ export async function extractTextFromFile(file: File): Promise<string> {
   if (fileName.endsWith(".pdf")) {
     try {
       const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version || "3.11.174"}/pdf.worker.min.js`;
+      // Stable worker URL matching standard pdfjs-dist distributions to prevent 404s
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
       const arrayBuffer = await file.arrayBuffer();
       const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -99,14 +100,13 @@ function analyzeCinematicElements(actionText: string, sceneHeading: string) {
 
 /**
  * 3. LLM SEMANTIC FALLBACK PARSER
- * Triggers when regex confidence is low, using an API endpoint to parse unstructured text.
  */
 async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ scenes: ParsedScene[]; characters: Map<string, ParsedCharacter>; sfxCues: string[] } | null> {
   try {
     const response = await fetch("/api/parse-script-llm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scriptText: rawText.slice(0, 15000) }), // Send first 15k chars for token safety
+      body: JSON.stringify({ scriptText: rawText.slice(0, 15000) }),
     });
 
     if (!response.ok) return null;
@@ -257,7 +257,6 @@ export async function processAndSyncScriptImport(
   }
 
   // --- LLM SEMANTIC FALLBACK TRIGGER ---
-  // If regex found fewer than 2 scenes or characters, invoke LLM semantic parser
   let finalScenes = scenes;
   let finalCharacters = charactersMap;
   let finalSfx = sfxCues;
@@ -272,7 +271,6 @@ export async function processAndSyncScriptImport(
     }
   }
 
-  // Absolute safety fallback
   if (finalScenes.length === 0) {
     finalScenes.push({
       sceneNumber: 1,
