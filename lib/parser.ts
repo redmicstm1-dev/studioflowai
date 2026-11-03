@@ -1,95 +1,156 @@
 import { supabase } from "@/lib/supabase";
 
+/**
+ * Extracts raw text from uploaded script files (.txt, .fountain, .pdf)
+ */
+export async function extractTextFromFile(file: File): Promise<string> {
+  if (!file) return "";
+
+  // Handle plain text or fountain files
+  if (file.type.includes("text") || file.name.endsWith(".txt") || file.name.endsWith(".fountain")) {
+    return await file.text();
+  }
+
+  // Fallback text reader for standard file buffers
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve((e.target?.result as string) || "");
+    reader.onerror = (err) => reject(err);
+    reader.readAsText(file);
+  });
+}
+
+/**
+ * Parses script content and auto-seeds data across Story, Shot, Voice, and Asset Library workshops
+ */
 export async function processAndSyncScriptImport(
   projectId: string,
   storyId: string,
   file: File,
   rawText: string
 ) {
-  const lines = rawText.split("\n").filter(Boolean);
+  if (!supabase) return;
+
+  // 1. Upload original script file to Supabase storage bucket (Asset Library)
+  const filePath = `${projectId}/${Date.now()}_${file.name}`;
+  const { data: uploadData } = await supabase.storage
+    .from("workshop_assets")
+    .upload(filePath, file);
+
+  if (uploadData) {
+    const { data: publicUrlData } = supabase.storage
+      .from("workshop_assets")
+      .getPublicUrl(filePath);
+
+    await supabase.from("workshop_assets").insert([
+      {
+        project_id: projectId,
+        file_name: file.name,
+        file_type: file.type || "text/plain",
+        file_url: publicUrlData?.publicUrl || "",
+        category: "script",
+      },
+    ]);
+  }
+
+  // 2. Parse lines to identify scene headings and character names
+  const lines = rawText.split("\n").map((line) => line.trim());
   
   const extractedCharacters = new Set<string>();
-  const extractedScenes: { heading: string; action: string; sceneNum: number }[] = [];
-  
-  let currentScene = { heading: "EXT. UNKNOWN LOCATION - DAY", action: "", sceneNum: 1 };
-  let sceneCounter = 1;
+  const extractedScenes: { heading: string; action: string }[] = [];
 
-  // 1. Parse raw text into structured cinematic entities
+  let currentHeading = "";
+  let currentActionBuffer: string[] = [];
+
   lines.forEach((line) => {
-    const trimmed = line.trim();
-    if (trimmed.startsWith("EXT.") || trimmed.startsWith("INT.") || trimmed.startsWith("EST.")) {
-      if (currentScene.action) extractedScenes.push({ ...currentScene });
-      sceneCounter++;
-      currentScene = { heading: trimmed, action: "", sceneNum: sceneCounter };
-    } else if (trimmed === trimmed.toUpperCase() && trimmed.length < 30 && !trimmed.includes(".")) {
-      extractedCharacters.add(trimmed);
-    } else {
-      currentScene.action += `${trimmed} `;
+    // Detect Scene Headings (EXT. or INT.)
+    if (line.startsWith("EXT.") || line.startsWith("INT.")) {
+      if (currentHeading) {
+        extractedScenes.push({
+          heading: currentHeading,
+          action: currentActionBuffer.join(" "),
+        });
+      }
+      currentHeading = line;
+      currentActionBuffer = [];
+    } else if (line) {
+      // Detect Character Names (ALL CAPS words in dialogue or character intro)
+      const matches = line.match(/\b[A-Z]{2,}(?:\s[A-Z]{2,})*\b/g);
+      if (matches) {
+        matches.forEach((char) => {
+          if (!["EXT", "INT", "DAY", "NIGHT", "CONTINUOUS"].includes(char)) {
+            extractedCharacters.add(char);
+          }
+        });
+      }
+      currentActionBuffer.push(line);
     }
   });
 
-  if (currentScene.action) extractedScenes.push(currentScene);
-
-  // 2. Save Original Script File to Central Asset Library
-  await supabase.from("workshop_assets").insert([
-    {
-      project_id: projectId,
-      story_id: storyId,
-      asset_name: file.name,
-      asset_type: "script",
-      file_url: "uploaded_locally_or_bucket_path",
-      tags: ["imported-script", "source-material"],
-    },
-  ]);
-
-  // 3. Populate Story Studio (Characters & Scripts)
-  const charInserts = Array.from(extractedCharacters).slice(0, 10).map((name) => ({
-    story_id: storyId,
-    name,
-    role: "Supporting",
-    bio: "Auto-extracted from script import.",
-    motivation: "Pending definition",
-    conflict: "Pending definition",
-  }));
-
-  if (charInserts.length > 0) {
-    await supabase.from("story_characters").insert(charInserts);
+  if (currentHeading) {
+    extractedScenes.push({
+      heading: currentHeading,
+      action: currentActionBuffer.join(" "),
+    });
   }
 
-  const scriptInserts = extractedScenes.map((s) => ({
-    story_id: storyId,
-    scene_number: s.sceneNum,
-    heading: s.heading,
-    action_text: s.action.trim(),
-    dialogue_block: [],
-  }));
+  // 3. Seed Characters into Story Studio & Voice Studio
+  for (const charName of Array.from(extractedCharacters)) {
+    const { data: charData } = await supabase
+      .from("story_characters")
+      .insert([
+        {
+          story_id: storyId,
+          name: charName,
+          role: "Supporting",
+          bio: `Auto-parsed from script: ${file.name}`,
+        },
+      ])
+      .select()
+      .single();
 
-  if (scriptInserts.length > 0) {
-    await supabase.from("story_scripts").insert(scriptInserts);
+    if (charData) {
+      // Broadcast voice profile to Voice Studio
+      await supabase.from("workshop_voices").insert([
+        {
+          story_id: storyId,
+          character_id: charData.id,
+          voice_model: "Standard Neural Voice",
+          dialogue_reference: `Voice initialized for ${charName}`,
+        },
+      ]);
+    }
   }
 
-  // 4. Automatically Sync & Seed Shot Studio from Scene Headings
-  const shotInserts = extractedScenes.map((s) => ({
-    story_id: storyId,
-    scene_number: s.sceneNum,
-    shot_number: 1,
-    angle: s.heading.includes("INT.") ? "MEDIUM SHOT" : "WIDE ESTABLISHING",
-    camera_movement: "STATIC",
-    description: `Primary shot for scene: ${s.heading}`,
-  }));
+  // 4. Seed Scenes into Story Scripts & Shot Studio
+  for (let i = 0; i < extractedScenes.length; i++) {
+    const scene = extractedScenes[i];
 
-  if (shotInserts.length > 0) {
-    await supabase.from("workshop_shots").insert(shotInserts);
-  }
+    const { data: scriptData } = await supabase
+      .from("story_scripts")
+      .insert([
+        {
+          story_id: storyId,
+          scene_number: i + 1,
+          heading: scene.heading,
+          action_text: scene.action,
+        },
+      ])
+      .select()
+      .single();
 
-  // 5. Initialize Voice Studio placeholders for extracted characters
-  const voiceInserts = Array.from(extractedCharacters).slice(0, 5).map((name) => ({
-    story_id: storyId,
-    voice_model: "Standard Neural Voice",
-    dialogue_reference: `Voice profile initialized for ${name}`,
-  }));
-
-  if (voiceInserts.length > 0) {
-    await supabase.from("workshop_voices").insert(voiceInserts);
+    if (scriptData) {
+      // Seed initial shot entry in Shot Studio
+      await supabase.from("workshop_shots").insert([
+        {
+          story_id: storyId,
+          scene_id: scriptData.id,
+          shot_number: 1,
+          shot_type: "Wide Shot",
+          camera_movement: "Static",
+          visual_prompt: `Establishing shot for ${scene.heading}`,
+        },
+      ]);
+    }
   }
 }
