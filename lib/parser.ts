@@ -8,12 +8,10 @@ export async function extractTextFromFile(file: File): Promise<string> {
 
   const fileName = file.name.toLowerCase();
 
-  // 1. Plain Text / Fountain Script Files
   if (fileName.endsWith(".txt") || fileName.endsWith(".fountain")) {
     return await file.text();
   }
 
-  // 2. Microsoft Word (.docx) Files via Mammoth
   if (fileName.endsWith(".docx")) {
     try {
       const mammoth = await import("mammoth");
@@ -21,15 +19,13 @@ export async function extractTextFromFile(file: File): Promise<string> {
       const result = await mammoth.extractRawText({ arrayBuffer });
       return result.value || "";
     } catch (err) {
-      console.warn("Mammoth DOCX extraction failed, falling back to basic reader:", err);
+      console.warn("Mammoth DOCX extraction failed, falling back:", err);
     }
   }
 
-  // 3. PDF Files via pdfjs-dist
   if (fileName.endsWith(".pdf")) {
     try {
       const pdfjsLib = await import("pdfjs-dist");
-      // Set worker source URL dynamically for browser runtime
       pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
       const arrayBuffer = await file.arrayBuffer();
@@ -39,19 +35,16 @@ export async function extractTextFromFile(file: File): Promise<string> {
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items
-          .map((item: any) => item.str)
-          .join(" ");
+        const pageText = textContent.items.map((item: any) => item.str).join(" ");
         fullText += pageText + "\n\n";
       }
 
       return fullText;
     } catch (err) {
-      console.warn("PDFJS parsing failed, using direct buffer fallback:", err);
+      console.warn("PDFJS parsing failed, falling back:", err);
     }
   }
 
-  // Generic Fallback Reader
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve((e.target?.result as string) || "");
@@ -61,8 +54,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
 }
 
 /**
- * Intelligent Multi-Pass Script Ingestion Engine
- * Parses scenes, characters, shot suggestions, and dialogue blocks across workshops.
+ * Intelligent Multi-Pass Script Ingestion Engine with explicit debug logging
  */
 export async function processAndSyncScriptImport(
   projectId: string,
@@ -70,20 +62,27 @@ export async function processAndSyncScriptImport(
   file: File,
   rawText: string
 ) {
-  if (!supabase || !rawText.trim()) return;
+  if (!supabase || !rawText.trim()) {
+    console.error("Parser Error: Supabase client uninitialized or rawText is empty.");
+    return;
+  }
+
+  console.log("Starting script sync for project:", projectId, "story:", storyId);
 
   // STEP 1: Upload Script to Asset Library
   const filePath = `${projectId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-  const { data: uploadData } = await supabase.storage
+  const { data: uploadData, error: uploadError } = await supabase.storage
     .from("workshop_assets")
     .upload(filePath, file);
 
-  if (uploadData) {
+  if (uploadError) {
+    console.error("Storage upload error:", uploadError.message);
+  } else if (uploadData) {
     const { data: publicUrlData } = supabase.storage
       .from("workshop_assets")
       .getPublicUrl(filePath);
 
-    await supabase.from("workshop_assets").insert([
+    const { error: assetDbError } = await supabase.from("workshop_assets").insert([
       {
         project_id: projectId,
         file_name: file.name,
@@ -92,15 +91,14 @@ export async function processAndSyncScriptImport(
         category: "script",
       },
     ]);
+    if (assetDbError) console.error("Asset DB insert error:", assetDbError.message);
   }
 
   // STEP 2: Intelligent Multi-Pass Text Parsing
   const lines = rawText.split(/\r?\n/).map((l) => l.trim());
 
-  // Regex Patterns for Screenplay Elements
   const SCENE_HEADING_REGEX = /^(?:INT\.|EXT\.|I\/E\.|INT\/EXT\.|EST\.|INT\s|EXT\s)[A-Z0-9\s\-\.\,\'\/\(\)]+/i;
   const CHARACTER_HEADER_REGEX = /^([A-Z0-9\s\.\'\-]{2,30})(?:\s*\((?:V\.O\.|O\.S\.|CONT'D|OVER|FILTER)\))?$/;
-  const TRANSITION_REGEX = /^(?:CUT TO:|FADE IN:|FADE OUT:|SMASH CUT:|DISSOLVE TO:)$/i;
 
   const charactersMap = new Map<string, { occurrences: number; dialogueSample: string }>();
   const scenes: { heading: string; action: string; dialogue: string[] }[] = [];
@@ -110,17 +108,14 @@ export async function processAndSyncScriptImport(
   let currentDialogueBuffer: string[] = [];
   let lastCharacterName = "";
 
-  // Reserved keywords to ignore during character extraction
   const EXCLUDED_TERMS = new Set([
     "INT", "EXT", "DAY", "NIGHT", "CONTINUOUS", "MORNING", "EVENING",
-    "FADE IN", "FADE OUT", "CUT TO", "SMASH CUT", "THE END", "PAGE",
-    "CONTINUED", "TITLE", "AUTHOR", "SCENE", "VERSION"
+    "FADE IN", "FADE OUT", "CUT TO", "SMASH CUT", "THE END", "PAGE"
   ]);
 
   lines.forEach((line) => {
     if (!line) return;
 
-    // Check for Scene Heading
     if (SCENE_HEADING_REGEX.test(line)) {
       if (currentHeading || currentActionBuffer.length > 0) {
         scenes.push({
@@ -136,10 +131,6 @@ export async function processAndSyncScriptImport(
       return;
     }
 
-    // Skip Transitions
-    if (TRANSITION_REGEX.test(line)) return;
-
-    // Check for Character Speaker Block
     const charMatch = line.match(CHARACTER_HEADER_REGEX);
     if (
       charMatch &&
@@ -148,7 +139,6 @@ export async function processAndSyncScriptImport(
       !EXCLUDED_TERMS.has(charMatch[1].trim())
     ) {
       const cleanCharName = charMatch[1].trim();
-
       if (cleanCharName.length >= 2) {
         lastCharacterName = cleanCharName;
         const existing = charactersMap.get(cleanCharName);
@@ -160,7 +150,6 @@ export async function processAndSyncScriptImport(
       }
     }
 
-    // Capture Dialogue vs Action lines
     if (lastCharacterName && line.length > 0) {
       const charInfo = charactersMap.get(lastCharacterName);
       if (charInfo && !charInfo.dialogueSample) {
@@ -172,7 +161,6 @@ export async function processAndSyncScriptImport(
     }
   });
 
-  // Push final scene
   if (currentHeading || currentActionBuffer.length > 0) {
     scenes.push({
       heading: currentHeading || "EXT. OPENING SCENE - DAY",
@@ -181,7 +169,6 @@ export async function processAndSyncScriptImport(
     });
   }
 
-  // STEP 3: Smart Fallback Safety Net
   if (scenes.length === 0) {
     scenes.push({
       heading: "EXT. MAIN PROJECT WORKSPACE - DAY",
@@ -197,11 +184,11 @@ export async function processAndSyncScriptImport(
     });
   }
 
-  // STEP 4: Database Seeding Across All Studios
+  console.log(`Parsed ${scenes.length} scenes and ${charactersMap.size} characters.`);
 
-  // Seed Characters & Voice Profiles
+  // STEP 3: Database Seeding Across All Studios
   for (const [name, info] of Array.from(charactersMap.entries())) {
-    const { data: charData } = await supabase
+    const { data: charData, error: charError } = await supabase
       .from("story_characters")
       .insert([
         {
@@ -214,8 +201,10 @@ export async function processAndSyncScriptImport(
       .select()
       .single();
 
-    if (charData) {
-      await supabase.from("workshop_voices").insert([
+    if (charError) {
+      console.error(`Error inserting character ${name}:`, charError.message);
+    } else if (charData) {
+      const { error: voiceError } = await supabase.from("workshop_voices").insert([
         {
           story_id: storyId,
           character_id: charData.id,
@@ -223,14 +212,14 @@ export async function processAndSyncScriptImport(
           dialogue_reference: info.dialogueSample || `Voice reference for ${name}`,
         },
       ]);
+      if (voiceError) console.error("Error inserting voice profile:", voiceError.message);
     }
   }
 
-  // Seed Scripts & Shot Studio Breakdown
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
 
-    const { data: scriptData } = await supabase
+    const { data: scriptData, error: scriptError } = await supabase
       .from("story_scripts")
       .insert([
         {
@@ -243,12 +232,12 @@ export async function processAndSyncScriptImport(
       .select()
       .single();
 
-    if (scriptData) {
-      const shotType = scene.heading.includes("INT.")
-        ? "Medium Close-up / Interior"
-        : "Wide Shot / Exterior";
+    if (scriptError) {
+      console.error(`Error inserting scene #${i + 1}:`, scriptError.message);
+    } else if (scriptData) {
+      const shotType = scene.heading.includes("INT.") ? "Medium Close-up / Interior" : "Wide Shot / Exterior";
 
-      await supabase.from("workshop_shots").insert([
+      const { error: shotError } = await supabase.from("workshop_shots").insert([
         {
           story_id: storyId,
           scene_id: scriptData.id,
@@ -258,11 +247,11 @@ export async function processAndSyncScriptImport(
           visual_prompt: `Cinematic render prompt for ${scene.heading}`,
         },
       ]);
+      if (shotError) console.error("Error inserting shot:", shotError.message);
     }
   }
 
-  // Seed Episode Overview
-  await supabase.from("story_episodes").insert([
+  const { error: epError } = await supabase.from("story_episodes").insert([
     {
       story_id: storyId,
       episode_number: 1,
@@ -270,4 +259,7 @@ export async function processAndSyncScriptImport(
       synopsis: `Auto-ingested screenplay containing ${scenes.length} scenes and ${charactersMap.size} key characters.`,
     },
   ]);
+  if (epError) console.error("Error inserting episode:", epError.message);
+
+  console.log("Script sync completed successfully!");
 }
