@@ -1,212 +1,190 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, X, Upload, FileText } from "lucide-react";
+import Button from "@/components/ui/Button";
+import Inputs from "@/components/ui/Inputs";
 import { supabase } from "@/lib/supabase";
+import { Project } from "@/types/project";
 import { extractTextFromFile, processAndSyncScriptImport } from "@/lib/parser";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
+  userId: string;
+  onProjectCreated: (project: Project) => void;
+  onError: (msg: string) => void;
 }
 
-export default function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps) {
+export default function CreateProjectModal({
+  isOpen,
+  onClose,
+  userId,
+  onProjectCreated,
+  onError,
+}: CreateProjectModalProps) {
   const router = useRouter();
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statusMessage, setStatusMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [projectName, setProjectName] = useState("");
+  const [scriptFile, setScriptFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   if (!isOpen) return null;
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      if (!title) {
-        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
-        setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
-      }
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!title.trim()) {
-      setErrorMessage("Project title is required.");
-      return;
-    }
+    if (!projectName.trim() || !supabase) return;
 
-    setIsSubmitting(true);
-    setErrorMessage("");
-    setStatusMessage("Authenticating session...");
+    setLoading(true);
+    setStatusText("Initializing project workspace...");
 
     try {
-      // 1. Get current authenticated user
-      const { data: { user } } = await supabase.auth.getUser();
-
-      setStatusMessage("Initializing project workspace...");
-
-      // 2. Insert Project into Database using owner_id to satisfy RLS
+      // 1. Create Main Project Record
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
         .insert([
           {
-            title: title.trim(),
-            description: description.trim() || "Autonomous screenplay workspace.",
-            ...(user ? { owner_id: user.id } : {}),
+            owner_id: userId,
+            title: projectName.trim(),
+            description: scriptFile
+              ? `Imported from script: ${scriptFile.name}`
+              : "New creative project initialized.",
+            project_type: "series",
+            status: "development",
+            progress: 0,
           },
         ])
         .select()
         .single();
 
-      if (projectError) throw projectError;
-      const projectId = projectData.id;
+      if (projectError || !projectData) {
+        throw new Error(projectError?.message || "Project creation failed.");
+      }
 
-      // 3. Insert Default Story Record linked to Project
+      // 2. Initialize Default Story Entry inside Story Studio
       const { data: storyData, error: storyError } = await supabase
-        .from("stories")
+        .from("project_stories")
         .insert([
           {
-            project_id: projectId,
-            title: title.trim(),
-            premise: description.trim(),
-            ...(user ? { owner_id: user.id } : {}),
+            project_id: projectData.id,
+            title: `${projectData.title} - Main Narrative`,
+            logline: scriptFile
+              ? "Generated from imported script text."
+              : "Initial story workstation concept.",
+            genre: "Drama",
           },
         ])
         .select()
         .single();
 
-      if (storyError) {
-        console.warn("Story table sync warning:", storyError);
-      }
-      const storyId = storyData?.id || projectId;
-
-      // 4. Process & Sync File Upload if attached during creation
-      if (selectedFile) {
-        setStatusMessage("Extracting text and running parser...");
-        const rawText = await extractTextFromFile(selectedFile);
-        
-        setStatusMessage("Seeding screenplay & workshops...");
-        await processAndSyncScriptImport(projectId, storyId, selectedFile, rawText);
+      if (storyError || !storyData) {
+        throw new Error("Failed to initialize story workspace.");
       }
 
-      setStatusMessage("Finalizing synchronization...");
+      // 3. Extract Script & Auto-Sync across all 4 Workshops (If Script Attached)
+      if (scriptFile) {
+        setStatusText("Extracting raw screenplay text...");
+        const rawText = await extractTextFromFile(scriptFile);
 
-      // 5. Reset Local State & Close Modal
-      setTitle("");
-      setDescription("");
-      setSelectedFile(null);
+        setStatusText("Syncing data to Story, Shot, Voice & Asset Library...");
+        await processAndSyncScriptImport(
+          projectData.id,
+          storyData.id,
+          scriptFile,
+          rawText
+        );
+      }
+
+      setLoading(false);
+      onProjectCreated(projectData);
+      setProjectName("");
+      setScriptFile(null);
       onClose();
 
-      // 6. HARD REFRESH & INSTANT NAVIGATION
+      // 4. AUTOMATIC UI REFRESH & INSTANT WORKSPACE REDIRECTION
       router.refresh();
-      router.push(`/workspace/${projectId}`);
+      router.push(`/workspace/${projectData.id}`);
     } catch (err: any) {
-      console.error("StudioFlow Creation Error:", err);
-      setErrorMessage(err.message || "Failed to complete project creation and script ingestion.");
-    } finally {
-      setIsSubmitting(false);
-      setStatusMessage("");
+      setLoading(false);
+      onError(err.message || "An unexpected error occurred during project creation.");
     }
-  };
+  }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <div 
-        className="w-full max-w-lg rounded-[18px] p-6 flex flex-col gap-5 my-auto max-h-[92vh] overflow-y-auto shadow-2xl"
-        style={{
-          background: "linear-gradient(145deg, #1d1d1a, #171715)",
-          border: "1px solid var(--line)"
-        }}
-      >
-        <div className="flex items-center justify-between border-b border-[#2b2a27] pb-4">
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm overflow-y-auto"
+    >
+      <div className="panel w-full max-w-lg p-6 shadow-2xl bg-[#181815] my-auto max-h-[92vh] overflow-y-auto">
+        <div className="mb-5 flex items-start justify-between">
           <div>
-            <h2 className="text-xl font-bold text-white tracking-wide">Create StudioFlow Project</h2>
-            <p className="text-xs muted mt-0.5">Autonomous screenplay ingestion & creative workshop</p>
+            <div className="mini-label mb-2">INTELLIGENT WORKSPACE SETUP</div>
+            <h2 className="text-xl font-semibold text-white">Create New Project</h2>
+            <p className="mt-1 text-sm text-[#9a968d]">
+              Optionally upload a script to automatically extract characters, shots, voices, and assets.
+            </p>
           </div>
-          <button 
+          <button
             type="button"
             onClick={onClose}
-            className="text-[#a5a39c] hover:text-white text-sm font-semibold p-1.5 rounded-xl hover:bg-[#29251f] transition-colors"
+            className="rounded-lg p-2 text-[#999] transition hover:bg-[#2b2a27]"
           >
-            ✕
+            <X size={18} />
           </button>
         </div>
 
-        {errorMessage && (
-          <div className="p-3 bg-red-950/60 border border-red-800/80 text-red-200 text-xs rounded-xl">
-            {errorMessage}
-          </div>
-        )}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <Inputs
+            label="Project name *"
+            id="project-name"
+            autoFocus
+            value={projectName}
+            onChange={(e) => setProjectName(e.target.value)}
+            placeholder="e.g., Cyberpunk Chronicles"
+            required
+          />
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="mini-label">Project Title</label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., Cyberpunk Chase Pilot"
-              required
-              className="px-4 py-3 bg-[#111110] border border-[#2b2a27] rounded-[11px] text-white text-sm focus:outline-none focus:border-[#f08a4b] transition-colors"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <label className="mini-label">Description / Premise</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief narrative overview..."
-              rows={2}
-              className="px-4 py-3 bg-[#111110] border border-[#2b2a27] rounded-[11px] text-white text-sm focus:outline-none focus:border-[#f08a4b] transition-colors resize-none"
-            />
-          </div>
-
-          {/* SCRIPT UPLOAD SECTION */}
-          <div className="flex flex-col gap-1.5">
-            <label className="mini-label">
-              Upload Screenplay <span className="text-[#a5a39c] font-normal lowercase">(Optional)</span>
+          <div>
+            <label className="block text-xs font-medium text-[#aaa69e] mb-1.5">
+              Import Screenplay / Script (Optional)
             </label>
-            <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-[#2b2a27] bg-[#111110]/50 hover:border-[#f08a4b]/50 rounded-[11px] cursor-pointer transition-all group">
-              <span className="text-xs font-medium text-[#a5a39c] group-hover:text-[#f08a4b] transition-colors text-center truncate max-w-full px-2">
-                {selectedFile ? `📄 ${selectedFile.name}` : "Click to select .pdf, .docx, .txt, or .fountain file"}
+            <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#33322e] bg-[#121210] p-6 cursor-pointer hover:border-[#f2a36f] transition">
+              <div className="flex items-center gap-2 text-xs text-[#f2a36f] mb-1">
+                <Upload size={16} />{" "}
+                {scriptFile ? scriptFile.name : "Click to upload .txt, .fountain, or .pdf"}
+              </div>
+              <span className="text-[11px] text-[#77746d] text-center">
+                StudioFlow will parse and seed data directly across Story Studio, Shot Studio, Voice Studio, and the Asset Library.
               </span>
-              <input 
-                type="file" 
-                accept=".pdf,.docx,.txt,.fountain" 
-                onChange={handleFileSelect} 
-                className="hidden" 
+              <input
+                type="file"
+                accept=".txt,.fountain,.pdf"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && setScriptFile(e.target.files[0])}
               />
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#2b2a27]">
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="ghost-button"
-            >
+          {loading && (
+            <div className="rounded-xl bg-[#1c2b23] border border-[#3c5b4b] p-3 text-xs text-[#a7dfc0] flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#a7dfc0] border-t-transparent" />
+              {statusText}
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" onClick={onClose} className="text-sm">
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
-              disabled={isSubmitting}
-              className="action-button flex items-center justify-center min-w-[140px]"
+              disabled={!projectName.trim() || loading}
+              className="action-button text-sm"
             >
-              {isSubmitting ? (
-                <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-[#20150f]/20 border-t-[#20150f] rounded-full animate-spin" />
-                  <span className="text-xs truncate max-w-[100px]">{statusMessage || "Processing..."}</span>
-                </span>
-              ) : (
-                "Create Project"
-              )}
-            </button>
+              {loading ? "Processing..." : "Create & Build Workspace"}
+            </Button>
           </div>
         </form>
       </div>
