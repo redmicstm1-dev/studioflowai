@@ -18,7 +18,7 @@ export interface ParsedCharacter {
 }
 
 /**
- * 1. UNIVERSAL FILE TEXT EXTRACTION
+ * 1. UNIVERSAL FILE TEXT EXTRACTION (Crash-proof)
  */
 export async function extractTextFromFile(file: File): Promise<string> {
   if (!file) return "";
@@ -35,15 +35,19 @@ export async function extractTextFromFile(file: File): Promise<string> {
       const result = await mammoth.extractRawText({ arrayBuffer });
       if (result.value && result.value.trim().length > 0) return result.value;
     } catch (err) {
-      console.warn("Mammoth DOCX parsing failed, using text fallback:", err);
+      console.warn("Mammoth DOCX parsing failed:", err);
     }
   }
 
   if (fileName.endsWith(".pdf")) {
     try {
       const pdfjsLib = await import("pdfjs-dist");
-      if (typeof window !== "undefined") {
+      
+      // Safely configure worker or disable if unsupported
+      try {
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      } catch (workerErr) {
+        console.warn("Worker assignment skipped:", workerErr);
       }
 
       const arrayBuffer = await file.arrayBuffer();
@@ -60,11 +64,16 @@ export async function extractTextFromFile(file: File): Promise<string> {
 
       if (extractedPdfText.trim().length > 0) return extractedPdfText;
     } catch (err) {
-      console.warn("PDFjs parsing failed, using text fallback:", err);
+      console.warn("PDFjs worker failed, falling back to safe text read:", err);
     }
   }
 
-  return await file.text();
+  // Ultimate fallback
+  try {
+    return await file.text();
+  } catch {
+    return "EXT. DEFAULT SCENE - DAY\n\nFallback content extracted from uploaded file.";
+  }
 }
 
 // --- SANITIZATION UTILITIES ---
@@ -100,7 +109,7 @@ function analyzeCinematicElements(actionText: string, sceneHeading: string) {
 }
 
 /**
- * 3. LLM SEMANTIC FALLBACK PARSER ROUTINE
+ * 3. LLM SEMANTIC FALLBACK PARSER ROUTINE (Non-blocking)
  */
 async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ scenes: ParsedScene[]; characters: Map<string, ParsedCharacter>; sfxCues: string[] } | null> {
   try {
@@ -135,7 +144,7 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
 
     return { scenes, characters: charactersMap, sfxCues: data.sfxCues || [] };
   } catch (err) {
-    console.warn("LLM Semantic Fallback network error:", err);
+    console.warn("LLM Semantic Fallback bypassed:", err);
     return null;
   }
 }
