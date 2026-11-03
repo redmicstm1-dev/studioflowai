@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Upload, FileText } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Inputs from "@/components/ui/Inputs";
 import { supabase } from "@/lib/supabase";
 import { Project } from "@/types/project";
+import { extractTextFromFile, processAndSyncScriptImport } from "@/lib/parser";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -23,7 +24,9 @@ export default function CreateProjectModal({
   onError,
 }: CreateProjectModalProps) {
   const [projectName, setProjectName] = useState("");
+  const [scriptFile, setScriptFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
+  const [statusText, setStatusText] = useState("");
 
   if (!isOpen) return null;
 
@@ -32,101 +35,148 @@ export default function CreateProjectModal({
     if (!projectName.trim() || !supabase) return;
 
     setLoading(true);
+    setStatusText("Initializing project workspace...");
 
-    const newProject: Omit<Project, "id" | "created_at" | "updated_at"> = {
-      owner_id: userId,
-      title: projectName.trim(),
-      description: "New creative project initialized in workspace.",
-      project_type: "series", // Lowercase matches database check constraints
-      status: "development",  // Lowercase matches standard database constraints
-      progress: 0,
-    };
+    try {
+      // 1. Create Main Project Record
+      const { data: projectData, error: projectError } = await supabase
+        .from("projects")
+        .insert([
+          {
+            owner_id: userId,
+            title: projectName.trim(),
+            description: scriptFile
+              ? `Imported from script: ${scriptFile.name}`
+              : "New creative project initialized.",
+            project_type: "series",
+            status: "development",
+            progress: 0,
+          },
+        ])
+        .select()
+        .single();
 
-    // 1. Insert Project Record
-    const { data: projectData, error: projectError } = await supabase
-      .from("projects")
-      .insert([newProject])
-      .select()
-      .single();
+      if (projectError || !projectData) {
+        throw new Error(projectError?.message || "Project creation failed.");
+      }
 
-    if (projectError || !projectData) {
+      // 2. Initialize Default Story Entry inside Story Studio
+      const { data: storyData, error: storyError } = await supabase
+        .from("project_stories")
+        .insert([
+          {
+            project_id: projectData.id,
+            title: `${projectData.title} - Main Narrative`,
+            logline: scriptFile
+              ? "Generated from imported script text."
+              : "Initial story workstation concept.",
+            genre: "Drama",
+          },
+        ])
+        .select()
+        .single();
+
+      if (storyError || !storyData) {
+        throw new Error("Failed to initialize story workspace.");
+      }
+
+      // 3. Extract Script & Auto-Sync across all 4 Workshops (If Script Attached)
+      if (scriptFile) {
+        setStatusText("Extracting raw screenplay text...");
+        const rawText = await extractTextFromFile(scriptFile);
+
+        setStatusText("Syncing data to Story, Shot, Voice & Asset Library...");
+        await processAndSyncScriptImport(
+          projectData.id,
+          storyData.id,
+          scriptFile,
+          rawText
+        );
+      }
+
       setLoading(false);
-      onError("Failed to create project: " + projectError?.message);
-      return;
+      onProjectCreated(projectData);
+      setProjectName("");
+      setScriptFile(null);
+      onClose();
+    } catch (err: any) {
+      setLoading(false);
+      onError(err.message || "An unexpected error occurred during project creation.");
     }
-
-    // 2. Automatically seed an initial Story Studio narrative workspace for this project
-    const { error: storyError } = await supabase.from("project_stories").insert([
-      {
-        project_id: projectData.id,
-        title: `${projectData.title} - Main Narrative`,
-        logline: "Initial story workspace concept.",
-        genre: "Drama",
-      },
-    ]);
-
-    setLoading(false);
-
-    if (storyError) {
-      console.warn("Project created, but failed to auto-seed initial story studio:", storyError.message);
-    }
-
-    onProjectCreated(projectData);
-    setProjectName("");
-    onClose();
   }
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-labelledby="create-title"
       className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
     >
-      <div className="panel w-full max-w-md p-6 shadow-2xl">
+      <div className="panel w-full max-w-lg p-6 shadow-2xl bg-[#181815]">
         <div className="mb-5 flex items-start justify-between">
           <div>
-            <div className="mini-label mb-2">NEW BEGINNINGS</div>
-            <h2 id="create-title" className="text-xl font-semibold">
-              What are we making?
-            </h2>
-            <p className="mt-1 text-sm text-[#9a968d]">Every project starts somewhere.</p>
+            <div className="mini-label mb-2">INTELLIGENT WORKSPACE SETUP</div>
+            <h2 className="text-xl font-semibold text-white">Create New Project</h2>
+            <p className="mt-1 text-sm text-[#9a968d]">
+              Optionally upload a script to automatically extract characters, shots, voices, and assets.
+            </p>
           </div>
           <button
-            aria-label="Close dialog"
             onClick={onClose}
             className="rounded-lg p-2 text-[#999] transition hover:bg-[#2b2a27]"
           >
-            <X size={18} aria-hidden="true" />
+            <X size={18} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <Inputs
-            label="Project name"
+            label="Project name *"
             id="project-name"
             autoFocus
             value={projectName}
             onChange={(e) => setProjectName(e.target.value)}
-            placeholder="A story, a film, an idea…"
+            placeholder="e.g., Cyberpunk Chronicles"
             required
           />
-          <div className="flex justify-end gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={onClose}
-              className="text-sm"
-            >
+
+          <div>
+            <label className="block text-xs font-medium text-[#aaa69e] mb-1.5">
+              Import Screenplay / Script (Optional)
+            </label>
+            <label className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#33322e] bg-[#121210] p-6 cursor-pointer hover:border-[#f2a36f] transition">
+              <div className="flex items-center gap-2 text-xs text-[#f2a36f] mb-1">
+                <Upload size={16} />{" "}
+                {scriptFile ? scriptFile.name : "Click to upload .txt, .fountain, or .pdf"}
+              </div>
+              <span className="text-[11px] text-[#77746d] text-center">
+                StudioFlow will parse and seed data directly across Story Studio, Shot Studio, Voice Studio, and the Asset Library.
+              </span>
+              <input
+                type="file"
+                accept=".txt,.fountain,.pdf"
+                className="hidden"
+                onChange={(e) => e.target.files?.[0] && setScriptFile(e.target.files[0])}
+              />
+            </label>
+          </div>
+
+          {loading && (
+            <div className="rounded-xl bg-[#1c2b23] border border-[#3c5b4b] p-3 text-xs text-[#a7dfc0] flex items-center gap-2">
+              <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#a7dfc0] border-t-transparent" />
+              {statusText}
+            </div>
+          )}
+
+          <div className="mt-6 flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" onClick={onClose} className="text-sm">
               Cancel
             </Button>
             <Button
               type="submit"
-              loading={loading}
               disabled={!projectName.trim() || loading}
-              className="action-button flex items-center gap-2 text-sm disabled:cursor-not-allowed disabled:opacity-40"
+              className="action-button text-sm"
             >
-              <Plus size={16} aria-hidden="true" /> Create project
+              {loading ? "Processing..." : "Create & Build Workspace"}
             </Button>
           </div>
         </form>
