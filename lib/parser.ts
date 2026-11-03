@@ -18,8 +18,7 @@ export interface ParsedCharacter {
 }
 
 /**
- * 1. MULTI-FORMAT EXTRACTION ENGINE
- * Universally extracts text from PDF, DOCX, Fountain, and Text files client-side.
+ * 1. UNIVERSAL FILE TEXT EXTRACTION
  */
 export async function extractTextFromFile(file: File): Promise<string> {
   if (!file) return "";
@@ -36,18 +35,20 @@ export async function extractTextFromFile(file: File): Promise<string> {
       const result = await mammoth.extractRawText({ arrayBuffer });
       if (result.value && result.value.trim().length > 0) return result.value;
     } catch (err) {
-      console.warn("Mammoth DOCX parsing failed:", err);
+      console.warn("Mammoth DOCX parsing failed, using text fallback:", err);
     }
   }
 
   if (fileName.endsWith(".pdf")) {
     try {
       const pdfjsLib = await import("pdfjs-dist");
-      // Stable worker URL matching standard pdfjs-dist distributions to prevent 404s
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      if (typeof window !== "undefined") {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+      }
 
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const pdf = await loadingTask.promise;
 
       let extractedPdfText = "";
       for (let i = 1; i <= pdf.numPages; i++) {
@@ -59,7 +60,7 @@ export async function extractTextFromFile(file: File): Promise<string> {
 
       if (extractedPdfText.trim().length > 0) return extractedPdfText;
     } catch (err) {
-      console.warn("PDFjs parsing failed:", err);
+      console.warn("PDFjs parsing failed, using text fallback:", err);
     }
   }
 
@@ -99,7 +100,7 @@ function analyzeCinematicElements(actionText: string, sceneHeading: string) {
 }
 
 /**
- * 3. LLM SEMANTIC FALLBACK PARSER
+ * 3. LLM SEMANTIC FALLBACK PARSER ROUTINE
  */
 async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ scenes: ParsedScene[]; characters: Map<string, ParsedCharacter>; sfxCues: string[] } | null> {
   try {
@@ -140,7 +141,7 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
 }
 
 /**
- * 4. ULTIMATE CORE PARSER & MULTI-PASS SYNC ENGINE
+ * 4. CORE PARSER & MULTI-PASS SYNC ENGINE
  */
 export async function processAndSyncScriptImport(
   projectId: string,
@@ -271,11 +272,12 @@ export async function processAndSyncScriptImport(
     }
   }
 
+  // Safety fallbacks
   if (finalScenes.length === 0) {
     finalScenes.push({
       sceneNumber: 1,
       heading: "EXT. MAIN PROJECT WORKSPACE - DAY",
-      action: cleanText.slice(0, 800),
+      action: cleanText.slice(0, 1500),
       dialogue: [],
       shotType: "Wide Establishing Shot",
       cameraMovement: "Slow Push In",
