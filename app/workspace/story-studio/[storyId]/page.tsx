@@ -9,21 +9,22 @@ import {
   Film,
   FileText,
   ShieldAlert,
-  Sparkles,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import Button from "@/components/ui/Button";
 
-// Import your workshop tab components
+// Import all 5 tab components
 import OverviewTab from "./components/OverviewTab";
 import CharactersTab from "./components/CharactersTab";
+import EpisodesTab from "./components/EpisodesTab";
+import ScriptsTab from "./components/ScriptsTab";
+import ContinuityTab from "./components/ContinuityTab";
 
 export default function StoryStudioWorkstation() {
   const router = useRouter();
   const routeParams = useParams();
 
-  // Safely extract the ID directly from useParams hook client-side
   const storyId = (routeParams?.id as string) || (routeParams?.storyId as string);
 
   const [loading, setLoading] = useState(true);
@@ -58,7 +59,6 @@ export default function StoryStudioWorkstation() {
       if (!mounted) return;
 
       if (error || !data) {
-        console.error("Supabase error fetching story:", error?.message);
         setNotice(error ? error.message : "Story record not found in database.");
       } else {
         setStory(data);
@@ -181,27 +181,9 @@ export default function StoryStudioWorkstation() {
       <div className="mt-6">
         {activeTab === "overview" && <OverviewTab storyId={story.id} />}
         {activeTab === "characters" && <CharactersTab storyId={story.id} />}
-        {activeTab === "episodes" && (
-          <div className="panel p-10 text-center text-[#8d8981]">
-            <Sparkles size={24} className="mx-auto mb-2 text-[#f2a36f]" />
-            <h3 className="text-sm font-semibold text-white">Episodes Module</h3>
-            <p className="text-xs mt-1">Episode breakdown and beat sheets active.</p>
-          </div>
-        )}
-        {activeTab === "scripts" && (
-          <div className="panel p-10 text-center text-[#8d8981]">
-            <Sparkles size={24} className="mx-auto mb-2 text-[#f2a36f]" />
-            <h3 className="text-sm font-semibold text-white">Scripts & Screenplay Editor</h3>
-            <p className="text-xs mt-1">Scene breakdown and parsed text editor active.</p>
-          </div>
-        )}
-        {activeTab === "continuity" && (
-          <div className="panel p-10 text-center text-[#8d8981]">
-            <Sparkles size={24} className="mx-auto mb-2 text-[#f2a36f]" />
-            <h3 className="text-sm font-semibold text-white">Continuity Rules Engine</h3>
-            <p className="text-xs mt-1">Lore and rule verification tracking.</p>
-          </div>
-        )}
+        {activeTab === "episodes" && <EpisodesTab storyId={story.id} />}
+        {activeTab === "scripts" && <ScriptsTab storyId={story.id} />}
+        {activeTab === "continuity" && <ContinuityTab storyId={story.id} />}
       </div>
     </div>
   );
