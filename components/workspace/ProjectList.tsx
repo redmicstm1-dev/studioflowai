@@ -1,114 +1,160 @@
 "use client";
 
-import { FileText, Film, Pencil, Trash2 } from "lucide-react";
-import { Project } from "@/types/project";
+import { useState, useEffect } from "react";
+import { Folder, MoreVertical, Trash2, Edit, ArrowRight } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import DeleteProjectModal from "./DeleteProjectModal";
+import EditProjectModal from "./EditProjectModal";
+import Button from "@/components/ui/Button";
 
-interface ProjectListProps {
-  projects: Project[];
-  loading?: boolean;
-  search: string;
-  onSelectProject: (project: Project) => void;
-  onEditProject: (project: Project) => void;
-  onDeleteProject: (project: Project) => void;
+interface Project {
+  id: string;
+  title: string;
+  description: string;
+  status: string;
+  progress: number;
 }
 
-export default function ProjectList({
-  projects,
-  loading = false,
-  search,
-  onSelectProject,
-  onEditProject,
-  onDeleteProject,
-}: ProjectListProps) {
-  if (loading) {
-    return (
-      <div className="divide-y divide-[#2b2a27]">
-        {[1, 2, 3].map((n) => (
-          <div key={n} className="flex animate-pulse items-center gap-4 px-5 py-4 md:px-6">
-            <div className="h-12 w-12 shrink-0 rounded-xl bg-[#23221e]" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="h-4 w-1/3 rounded bg-[#23221e]" />
-              <div className="h-3 w-1/2 rounded bg-[#1c1b18]" />
-              <div className="h-1 w-full max-w-[260px] rounded bg-[#1c1b18]" />
-            </div>
-          </div>
-        ))}
-      </div>
-    );
+export default function ProjectList({ userId }: { userId: string }) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modal Control States
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    fetchProjects();
+  }, [userId]);
+
+  async function fetchProjects() {
+    if (!supabase) return;
+    setLoading(true);
+
+    const { data, error } = await supabase
+      .from("projects")
+      .select("*")
+      .eq("owner_id", userId)
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setNotice(`Failed to load projects: ${error.message}`);
+    } else {
+      setProjects(data || []);
+    }
+    setLoading(false);
   }
 
-  const filtered = projects.filter((p) =>
-    `${p.title} ${p.project_type} ${p.description}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
-
   return (
-    <div className="divide-y divide-[#2b2a27]">
-      {filtered.length === 0 ? (
-        <div className="px-6 py-12 text-center text-xs text-[#8f8b83]">
-          No projects found. Click <strong className="text-[#f08a4b]">Create project</strong> to add your first idea!
+    <div>
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-xl font-semibold text-white">Your Projects</h2>
+      </div>
+
+      {notice && (
+        <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">
+          {notice}
+        </div>
+      )}
+
+      {loading ? (
+        <div className="flex h-48 items-center justify-center">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#39342e] border-t-[#f2a36f]" />
+        </div>
+      ) : projects.length === 0 ? (
+        <div className="panel p-10 text-center border-dashed border-[#33322e]">
+          <Folder size={28} className="mx-auto mb-2 text-[#f2a36f]" />
+          <h4 className="text-sm font-semibold text-white">No Projects Found</h4>
+          <p className="mt-1 text-xs text-[#8d8981]">
+            Create your first project above or import a screenplay to get started.
+          </p>
         </div>
       ) : (
-        filtered.slice(0, 5).map((p, i) => (
-          <div
-            key={p.id || `${p.title}-${i}`}
-            className="group flex items-center gap-4 px-5 py-4 transition hover:bg-white/[.025] md:px-6"
-          >
-            <button
-              onClick={() => onSelectProject(p)}
-              className="flex min-w-0 flex-1 items-center gap-4 text-left"
-            >
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#f08a4b]/20 text-[#f08a4b]">
-                {p.project_type?.toLowerCase().includes("film") ? (
-                  <Film size={21} />
-                ) : (
-                  <FileText size={21} />
-                )}
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="mb-1 flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{p.title}</span>
-                  <span className="hidden rounded-md border border-[#393832] px-1.5 py-0.5 text-[9px] uppercase tracking-wider text-[#9a968d] sm:inline">
-                    {p.project_type}
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {projects.map((project) => (
+            <div key={project.id} className="panel p-5 bg-[#181815] flex flex-col justify-between">
+              <div>
+                <div className="flex items-start justify-between mb-3">
+                  <span className="rounded-md border border-[#393832] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[#e7a170] bg-[#e7a170]/10">
+                    {project.status || "Development"}
                   </span>
+                  
+                  {/* Action Dropdown / Buttons */}
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => {
+                        setSelectedProject(project);
+                        setIsEditOpen(true);
+                      }}
+                      className="p-1.5 text-[#8d8981] hover:text-white transition rounded-lg hover:bg-[#22211e]"
+                      title="Edit Project"
+                    >
+                      <Edit size={14} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedProject(project);
+                        setIsDeleteOpen(true);
+                      }}
+                      className="p-1.5 text-[#8d8981] hover:text-red-400 transition rounded-lg hover:bg-[#22211e]"
+                      title="Delete Project"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
-                <div className="truncate text-xs text-[#8d8981]">{p.description}</div>
-                <div className="mt-3 h-1 w-full max-w-[260px] overflow-hidden rounded-full bg-[#33322e]">
-                  <div
-                    className="h-full rounded-full bg-[#f08a4b]"
-                    style={{ width: `${p.progress}%` }}
-                  />
-                </div>
-              </div>
-            </button>
 
-            <div className="hidden text-right sm:block">
-              <div className="text-xs text-[#aaa69e]">{p.status}</div>
-              <div className="mt-1 text-[10px] text-[#77746d]">
-                {p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "Just now"}
+                <h3 className="text-base font-semibold text-white">{project.title}</h3>
+                <p className="mt-1.5 text-xs text-[#9a968d] line-clamp-2 leading-relaxed">
+                  {project.description || "No description provided."}
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-[#2b2a27] flex items-center justify-between">
+                <span className="text-[11px] text-[#77746d]">Progress: {project.progress}%</span>
+                <a
+                  href={`/workspace/projects/${project.id}`}
+                  className="flex items-center gap-1 text-xs font-medium text-[#f2a36f] hover:underline"
+                >
+                  Open Workspace <ArrowRight size={13} />
+                </a>
               </div>
             </div>
-
-            <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100">
-              <button
-                aria-label="Edit project"
-                onClick={() => onEditProject(p)}
-                className="rounded-lg p-2 text-[#aaa] transition hover:bg-[#2b2a27] hover:text-white"
-              >
-                <Pencil size={16} />
-              </button>
-              <button
-                aria-label="Delete project"
-                onClick={() => onDeleteProject(p)}
-                className="rounded-lg p-2 text-[#aaa] transition hover:bg-red-500/10 hover:text-red-400"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        ))
+          ))}
+        </div>
       )}
+
+      {/* Delete Project Modal Integration */}
+      <DeleteProjectModal
+        isOpen={isDeleteOpen}
+        onClose={() => {
+          setIsDeleteOpen(false);
+          setSelectedProject(null);
+        }}
+        project={selectedProject}
+        onProjectDeleted={(deletedId) => {
+          setProjects((prev) => prev.filter((p) => p.id !== deletedId));
+        }}
+        onError={(msg) => setNotice(msg)}
+      />
+
+      {/* Edit Project Modal Integration (if applicable) */}
+      <EditProjectModal
+        isOpen={isEditOpen}
+        onClose={() => {
+          setIsEditOpen(false);
+          setSelectedProject(null);
+        }}
+        project={selectedProject}
+        onProjectUpdated={(updatedProject) => {
+          setProjects((prev) =>
+            prev.map((p) => (p.id === updatedProject.id ? updatedProject : p))
+          );
+        }}
+        onError={(msg) => setNotice(msg)}
+      />
     </div>
   );
 }
