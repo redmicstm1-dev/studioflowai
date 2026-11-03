@@ -104,7 +104,7 @@ export default function CreateProjectModal({
 
       // 4. AUTOMATIC UI REFRESH & INSTANT WORKSPACE REDIRECTION
       router.refresh();
-      router.push(`/workspace/${projectData.id}`);
+      router.push(`/project/${projectData.id}`);
     } catch (err: any) {
       setLoading(false);
       onError(err.message || "An unexpected error occurred during project creation.");
