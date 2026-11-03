@@ -44,19 +44,19 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     setStatusMessage("Authenticating session...");
 
     try {
-      // 1. Get current authenticated user (bypasses RLS policy violations)
+      // 1. Get current authenticated user
       const { data: { user } } = await supabase.auth.getUser();
 
       setStatusMessage("Initializing project workspace...");
 
-      // 2. Insert Project into Database with user_id if available
+      // 2. Insert Project into Database using owner_id to satisfy RLS
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
         .insert([
           {
             title: title.trim(),
             description: description.trim() || "Autonomous screenplay workspace.",
-            ...(user ? { user_id: user.id } : {}), // Attach user ID if logged in
+            ...(user ? { owner_id: user.id } : {}),
           },
         ])
         .select()
@@ -73,7 +73,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             project_id: projectId,
             title: title.trim(),
             premise: description.trim(),
-            ...(user ? { user_id: user.id } : {}),
+            ...(user ? { owner_id: user.id } : {}),
           },
         ])
         .select()
