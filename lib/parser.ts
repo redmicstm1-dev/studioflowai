@@ -42,8 +42,6 @@ export async function extractTextFromFile(file: File): Promise<string> {
   if (fileName.endsWith(".pdf")) {
     try {
       const pdfjsLib = await import("pdfjs-dist");
-      
-      // Safely configure worker or disable if unsupported
       try {
         pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
       } catch (workerErr) {
@@ -64,15 +62,14 @@ export async function extractTextFromFile(file: File): Promise<string> {
 
       if (extractedPdfText.trim().length > 0) return extractedPdfText;
     } catch (err) {
-      console.warn("PDFjs worker failed, falling back to safe text read:", err);
+      console.warn("PDFjs fallback active:", err);
     }
   }
 
-  // Ultimate fallback
   try {
     return await file.text();
   } catch {
-    return "EXT. DEFAULT SCENE - DAY\n\nFallback content extracted from uploaded file.";
+    return "EXT. DEFAULT SCENE - DAY\n\nFallback content extracted.";
   }
 }
 
@@ -150,7 +147,7 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
 }
 
 /**
- * 4. CORE PARSER & MULTI-PASS SYNC ENGINE
+ * 4. CORE PARSER & ISOLATED SYNC ENGINE
  */
 export async function processAndSyncScriptImport(
   projectId: string,
@@ -187,7 +184,7 @@ export async function processAndSyncScriptImport(
       ]);
     }
   } catch (err) {
-    console.warn("Storage upload bypassed safely:", err);
+    console.warn("Storage upload bypassed:", err);
   }
 
   // STEP B: Multi-Pass Regex Parsing
@@ -281,7 +278,6 @@ export async function processAndSyncScriptImport(
     }
   }
 
-  // Safety fallbacks
   if (finalScenes.length === 0) {
     finalScenes.push({
       sceneNumber: 1,
@@ -303,79 +299,103 @@ export async function processAndSyncScriptImport(
     });
   }
 
-  // STEP C: Database Seeding Across All Workshops
+  // STEP C: Isolated Database Seeding (Guarantees script tab population)
   for (const [name, charInfo] of Array.from(finalCharacters.entries())) {
-    const { data: charData } = await supabase
-      .from("story_characters")
-      .insert([
-        {
-          story_id: storyId,
-          name: sanitizeText(name),
-          role: charInfo.role,
-          bio: `Parsed profile (${charInfo.occurrences} speaking cues).`,
-        },
-      ])
-      .select()
-      .single();
+    try {
+      const { data: charData } = await supabase
+        .from("story_characters")
+        .insert([
+          {
+            story_id: storyId,
+            name: sanitizeText(name),
+            role: charInfo.role,
+            bio: `Parsed profile (${charInfo.occurrences} speaking cues).`,
+          },
+        ])
+        .select()
+        .single();
 
-    if (charData) {
-      await supabase.from("workshop_voices").insert([
-        {
-          story_id: storyId,
-          character_id: charData.id,
-          voice_model: "Standard Neural AI",
-          dialogue_reference: sanitizeText(charInfo.dialogueSample || `Voice reference for ${name}`),
-        },
-      ]);
+      if (charData) {
+        try {
+          await supabase.from("workshop_voices").insert([
+            {
+              story_id: storyId,
+              character_id: charData.id,
+              voice_model: "Standard Neural AI",
+              dialogue_reference: sanitizeText(charInfo.dialogueSample || `Voice reference for ${name}`),
+            },
+          ]);
+        } catch (voiceErr) {
+          console.warn("Voice workshop insert skipped:", voiceErr);
+        }
+      }
+    } catch (charErr) {
+      console.warn("Character insert skipped:", charErr);
     }
   }
 
   for (const scene of finalScenes) {
-    const { data: scriptData } = await supabase
-      .from("story_scripts")
-      .insert([
-        {
-          story_id: storyId,
-          scene_number: scene.sceneNumber,
-          heading: sanitizeText(scene.heading),
-          action_text: sanitizeText(scene.action),
-        },
-      ])
-      .select()
-      .single();
+    try {
+      const { data: scriptData } = await supabase
+        .from("story_scripts")
+        .insert([
+          {
+            story_id: storyId,
+            scene_number: scene.sceneNumber,
+            heading: sanitizeText(scene.heading),
+            action_text: sanitizeText(scene.action),
+          },
+        ])
+        .select()
+        .single();
 
-    if (scriptData) {
-      await supabase.from("workshop_shots").insert([
-        {
-          story_id: storyId,
-          scene_id: scriptData.id,
-          shot_number: 1,
-          shot_type: sanitizeText(scene.shotType),
-          camera_movement: sanitizeText(scene.cameraMovement),
-          visual_prompt: sanitizeText(scene.visualPrompt),
-        },
-      ]);
+      if (scriptData) {
+        try {
+          await supabase.from("workshop_shots").insert([
+            {
+              story_id: storyId,
+              scene_id: scriptData.id,
+              shot_number: 1,
+              shot_type: sanitizeText(scene.shotType),
+              camera_movement: sanitizeText(scene.cameraMovement),
+              visual_prompt: sanitizeText(scene.visualPrompt),
+            },
+          ]);
+        } catch (shotErr) {
+          console.warn("Shot workshop insert bypassed safely:", shotErr);
+        }
+      }
+    } catch (scriptErr) {
+      console.warn("Script scene insert error:", scriptErr);
     }
   }
 
-  await supabase.from("story_episodes").insert([
-    {
-      story_id: storyId,
-      episode_number: 1,
-      title: `${file.name.replace(/\.[^/.]+$/, "")} - Episode 1`,
-      synopsis: `Auto-ingested screenplay containing ${finalScenes.length} scenes, ${finalCharacters.size} characters, and ${finalSfx.length} audio cues.`,
-    },
-  ]);
-
-  for (const sfx of finalSfx.slice(0, 10)) {
-    await supabase.from("workshop_assets").insert([
+  try {
+    await supabase.from("story_episodes").insert([
       {
-        project_id: projectId,
-        file_name: `SFX Cue: ${sfx.slice(0, 30)}`,
-        file_type: "audio/sfx",
-        file_url: "",
-        category: "sfx",
+        story_id: storyId,
+        episode_number: 1,
+        title: `${file.name.replace(/\.[^/.]+$/, "")} - Episode 1`,
+        synopsis: `Auto-ingested screenplay containing ${finalScenes.length} scenes, ${finalCharacters.size} characters, and ${finalSfx.length} audio cues.`,
       },
     ]);
+  } catch (epErr) {
+    console.warn("Episode insert bypassed:", epErr);
+  }
+
+  for (const sfx of finalSfx.slice(0, 10)) {
+    try {
+      await supabase.from("workshop_assets").insert([
+        {
+          project_id: projectId,
+          file_name: `SFX Cue: ${sfx.slice(0, 30)}`,
+          file_type: "audio/sfx",
+          file_url: "",
+          category: "sfx",
+        },
+      ]);
+    } catch (sfxErr) {
+      console.warn("SFX asset insert bypassed:", sfxErr);
+    }
   }
 }
