@@ -3,21 +3,35 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { extractTextFromFile, processAndSyncScriptImport } from "@/lib/parser";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  userId?: string; // Optional depending on your auth schema
 }
 
-export default function CreateProjectModal({ isOpen, onClose, userId }: CreateProjectModalProps) {
+export default function CreateProjectModal({ isOpen, onClose }: CreateProjectModalProps) {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statusMessage, setStatusMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
   if (!isOpen) return null;
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      if (!title) {
+        // Auto-fill title from filename if title is empty
+        const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
+        setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,59 +42,89 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
 
     setIsSubmitting(true);
     setErrorMessage("");
+    setStatusMessage("Initializing project workspace...");
 
     try {
-      // 1. Insert new project into Supabase
+      // 1. Insert Project into Database
       const { data: projectData, error: projectError } = await supabase
-        .from("projects") // Adjust table name if your schema uses "stories" or "projects"
+        .from("projects")
         .insert([
           {
             title: title.trim(),
-            description: description.trim(),
-            user_id: userId || null,
+            description: description.trim() || "Autonomous screenplay workspace.",
           },
         ])
         .select()
         .single();
 
       if (projectError) throw projectError;
+      const projectId = projectData.id;
 
-      // 2. Clear form state
+      // 2. Insert Default Story Record linked to Project
+      const { data: storyData, error: storyError } = await supabase
+        .from("stories")
+        .insert([
+          {
+            project_id: projectId,
+            title: title.trim(),
+            premise: description.trim(),
+          },
+        ])
+        .select()
+        .single();
+
+      if (storyError) {
+        console.warn("Story table sync warning:", storyError);
+      }
+      const storyId = storyData?.id || projectId;
+
+      // 3. Process & Sync File Upload if attached during creation
+      if (selectedFile) {
+        setStatusMessage("Extracting text and running AI/Regex parser...");
+        const rawText = await extractTextFromFile(selectedFile);
+        
+        setStatusMessage("Seeding screenplay, characters & shot workshops...");
+        await processAndSyncScriptImport(projectId, storyId, selectedFile, rawText);
+      }
+
+      setStatusMessage("Finalizing workspace synchronization...");
+
+      // 4. Reset Local State & Close Modal
       setTitle("");
       setDescription("");
-
-      // 3. Close the modal
+      setSelectedFile(null);
       onClose();
 
-      // 4. Instantly refresh server components, project counts, and stats cards in real time!
+      // 5. HARD REFRESH & INSTANT NAVIGATION
       router.refresh();
+      router.push(`/workspace/${projectId}`);
     } catch (err: any) {
-      console.error("Failed to create project:", err);
-      setErrorMessage(err.message || "An error occurred while creating the project.");
+      console.error("StudioFlow Creation Error:", err);
+      setErrorMessage(err.message || "Failed to complete project creation and script ingestion.");
     } finally {
       setIsSubmitting(false);
+      setStatusMessage("");
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl p-6 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white">Create New Project</h2>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+      <div className="w-full max-w-lg bg-[#0a0a0c] border border-zinc-800/90 rounded-2xl shadow-2xl p-6 flex flex-col gap-5 my-auto max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-4">
+          <div>
+            <h2 className="text-xl font-bold text-white tracking-wide">Create StudioFlow Project</h2>
+            <p className="text-xs text-zinc-400 mt-0.5">Autonomous screenplay ingestion & creative workshop</p>
+          </div>
           <button 
             onClick={onClose}
-            className="text-zinc-400 hover:text-white text-sm font-medium px-2 py-1 rounded"
+            className="text-zinc-400 hover:text-white text-sm font-semibold p-1.5 rounded-xl hover:bg-zinc-800/60 transition-colors"
           >
             ✕
           </button>
         </div>
 
-        <p className="text-sm text-zinc-400">
-          Set up your workspace to begin script ingestion, scene breakdowns, and media generation.
-        </p>
-
         {errorMessage && (
-          <div className="p-3 bg-red-950/50 border border-red-800 text-red-200 text-xs rounded-lg">
+          <div className="p-3 bg-red-950/60 border border-red-800/80 text-red-200 text-xs rounded-xl">
             {errorMessage}
           </div>
         )}
@@ -94,7 +138,7 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Cyberpunk Chase Pilot"
               required
-              className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500"
+              className="px-4 py-3 bg-zinc-950 border border-zinc-800/80 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors"
             />
           </div>
 
@@ -103,27 +147,52 @@ export default function CreateProjectModal({ isOpen, onClose, userId }: CreatePr
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief overview of your narrative or mini-ecommerce workspace..."
-              rows={3}
-              className="px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-white text-sm focus:outline-none focus:border-indigo-500 resize-none"
+              placeholder="Brief narrative overview..."
+              rows={2}
+              className="px-4 py-3 bg-zinc-950 border border-zinc-800/80 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors resize-none"
             />
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-2">
+          {/* INLINE SCRIPT UPLOAD SECTION */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+              Upload Screenplay <span className="text-zinc-500 font-normal">(Optional)</span>
+            </label>
+            <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-zinc-800 bg-zinc-950/50 hover:border-indigo-500/50 rounded-xl cursor-pointer transition-all group">
+              <span className="text-xs font-medium text-zinc-300 group-hover:text-indigo-400 transition-colors text-center truncate max-w-full px-2">
+                {selectedFile ? `📄 ${selectedFile.name}` : "Click to select .pdf, .docx, .txt, or .fountain file"}
+              </span>
+              <input 
+                type="file" 
+                accept=".pdf,.docx,.txt,.fountain" 
+                onChange={handleFileSelect} 
+                className="hidden" 
+              />
+            </label>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800/60">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition-colors"
+              className="px-4.5 py-2.5 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 text-sm font-medium rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors shadow-lg shadow-indigo-600/20 disabled:opacity-50 flex items-center justify-center min-w-[140px]"
             >
-              {isSubmitting ? "Creating..." : "Create Project"}
+              {isSubmitting ? (
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  <span className="text-xs truncate max-w-[100px]">{statusMessage || "Processing..."}</span>
+                </span>
+              ) : (
+                "Create Project"
+              )}
             </button>
           </div>
         </form>
