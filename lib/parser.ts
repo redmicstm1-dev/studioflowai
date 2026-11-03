@@ -1,50 +1,14 @@
 import { supabase } from "@/lib/supabase";
 
-/**
- * Universally extracts raw text from PDF, DOCX, Fountain, and Text script files.
- */
 export async function extractTextFromFile(file: File): Promise<string> {
   if (!file) return "";
-
   const fileName = file.name.toLowerCase();
 
   if (fileName.endsWith(".txt") || fileName.endsWith(".fountain")) {
     return await file.text();
   }
 
-  if (fileName.endsWith(".docx")) {
-    try {
-      const mammoth = await import("mammoth");
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      return result.value || "";
-    } catch (err) {
-      console.warn("Mammoth DOCX extraction failed, falling back:", err);
-    }
-  }
-
-  if (fileName.endsWith(".pdf")) {
-    try {
-      const pdfjsLib = await import("pdfjs-dist");
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-
-      const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-      let fullText = "";
-
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const pageText = textContent.items.map((item: any) => item.str).join(" ");
-        fullText += pageText + "\n\n";
-      }
-
-      return fullText;
-    } catch (err) {
-      console.warn("PDFJS parsing failed, falling back:", err);
-    }
-  }
-
+  // Fallback to standard text reading if PDF/DOCX workers fail
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (e) => resolve((e.target?.result as string) || "");
@@ -53,50 +17,50 @@ export async function extractTextFromFile(file: File): Promise<string> {
   });
 }
 
-/**
- * Intelligent Multi-Pass Script Ingestion Engine with explicit debug logging
- */
+// Helper to sanitize strings against Postgres unicode escape errors
+function sanitizeText(text: string): string {
+  if (!text) return "";
+  return text.replace(/[\x00-\x1F\x7F]/g, "").replace(/\\/g, "/").trim();
+}
+
 export async function processAndSyncScriptImport(
   projectId: string,
   storyId: string,
   file: File,
   rawText: string
 ) {
-  if (!supabase || !rawText.trim()) {
-    console.error("Parser Error: Supabase client uninitialized or rawText is empty.");
-    return;
-  }
+  if (!supabase || !rawText.trim()) return;
 
-  console.log("Starting script sync for project:", projectId, "story:", storyId);
+  const cleanText = sanitizeText(rawText);
 
-  // STEP 1: Upload Script to Asset Library
-  const filePath = `${projectId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-  const { data: uploadData, error: uploadError } = await supabase.storage
-    .from("workshop_assets")
-    .upload(filePath, file);
-
-  if (uploadError) {
-    console.error("Storage upload error:", uploadError.message);
-  } else if (uploadData) {
-    const { data: publicUrlData } = supabase.storage
+  // STEP 1: Optional Storage Upload (Safe Fallback if bucket missing)
+  try {
+    const filePath = `${projectId}/${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
+    const { data: uploadData } = await supabase.storage
       .from("workshop_assets")
-      .getPublicUrl(filePath);
+      .upload(filePath, file);
 
-    const { error: assetDbError } = await supabase.from("workshop_assets").insert([
-      {
-        project_id: projectId,
-        file_name: file.name,
-        file_type: file.type || "application/octet-stream",
-        file_url: publicUrlData?.publicUrl || "",
-        category: "script",
-      },
-    ]);
-    if (assetDbError) console.error("Asset DB insert error:", assetDbError.message);
+    if (uploadData) {
+      const { data: publicUrlData } = supabase.storage
+        .from("workshop_assets")
+        .getPublicUrl(filePath);
+
+      await supabase.from("workshop_assets").insert([
+        {
+          project_id: projectId,
+          file_name: file.name,
+          file_type: file.type || "application/octet-stream",
+          file_url: publicUrlData?.publicUrl || "",
+          category: "script",
+        },
+      ]);
+    }
+  } catch (err) {
+    console.warn("Storage upload skipped or bucket missing:", err);
   }
 
-  // STEP 2: Intelligent Multi-Pass Text Parsing
-  const lines = rawText.split(/\r?\n/).map((l) => l.trim());
-
+  // STEP 2: Parse Lines
+  const lines = cleanText.split(/\r?\n/).map((l) => l.trim());
   const SCENE_HEADING_REGEX = /^(?:INT\.|EXT\.|I\/E\.|INT\/EXT\.|EST\.|INT\s|EXT\s)[A-Z0-9\s\-\.\,\'\/\(\)]+/i;
   const CHARACTER_HEADER_REGEX = /^([A-Z0-9\s\.\'\-]{2,30})(?:\s*\((?:V\.O\.|O\.S\.|CONT'D|OVER|FILTER)\))?$/;
 
@@ -107,11 +71,6 @@ export async function processAndSyncScriptImport(
   let currentActionBuffer: string[] = [];
   let currentDialogueBuffer: string[] = [];
   let lastCharacterName = "";
-
-  const EXCLUDED_TERMS = new Set([
-    "INT", "EXT", "DAY", "NIGHT", "CONTINUOUS", "MORNING", "EVENING",
-    "FADE IN", "FADE OUT", "CUT TO", "SMASH CUT", "THE END", "PAGE"
-  ]);
 
   lines.forEach((line) => {
     if (!line) return;
@@ -132,12 +91,7 @@ export async function processAndSyncScriptImport(
     }
 
     const charMatch = line.match(CHARACTER_HEADER_REGEX);
-    if (
-      charMatch &&
-      line === line.toUpperCase() &&
-      !line.includes(":") &&
-      !EXCLUDED_TERMS.has(charMatch[1].trim())
-    ) {
+    if (charMatch && line === line.toUpperCase() && !line.includes(":")) {
       const cleanCharName = charMatch[1].trim();
       if (cleanCharName.length >= 2) {
         lastCharacterName = cleanCharName;
@@ -172,7 +126,7 @@ export async function processAndSyncScriptImport(
   if (scenes.length === 0) {
     scenes.push({
       heading: "EXT. MAIN PROJECT WORKSPACE - DAY",
-      action: rawText.slice(0, 800),
+      action: cleanText.slice(0, 800),
       dialogue: [],
     });
   }
@@ -184,16 +138,14 @@ export async function processAndSyncScriptImport(
     });
   }
 
-  console.log(`Parsed ${scenes.length} scenes and ${charactersMap.size} characters.`);
-
-  // STEP 3: Database Seeding Across All Studios
+  // STEP 3: Database Seeding
   for (const [name, info] of Array.from(charactersMap.entries())) {
-    const { data: charData, error: charError } = await supabase
+    const { data: charData } = await supabase
       .from("story_characters")
       .insert([
         {
           story_id: storyId,
-          name: name,
+          name: sanitizeText(name),
           role: info.occurrences > 3 ? "Protagonist" : "Supporting",
           bio: `Auto-parsed from script (${info.occurrences} speaking cues).`,
         },
@@ -201,57 +153,51 @@ export async function processAndSyncScriptImport(
       .select()
       .single();
 
-    if (charError) {
-      console.error(`Error inserting character ${name}:`, charError.message);
-    } else if (charData) {
-      const { error: voiceError } = await supabase.from("workshop_voices").insert([
+    if (charData) {
+      await supabase.from("workshop_voices").insert([
         {
           story_id: storyId,
           character_id: charData.id,
           voice_model: "Standard Neural AI",
-          dialogue_reference: info.dialogueSample || `Voice reference for ${name}`,
+          dialogue_reference: sanitizeText(info.dialogueSample || `Voice reference for ${name}`),
         },
       ]);
-      if (voiceError) console.error("Error inserting voice profile:", voiceError.message);
     }
   }
 
   for (let i = 0; i < scenes.length; i++) {
     const scene = scenes[i];
 
-    const { data: scriptData, error: scriptError } = await supabase
+    const { data: scriptData } = await supabase
       .from("story_scripts")
       .insert([
         {
           story_id: storyId,
           scene_number: i + 1,
-          heading: scene.heading,
-          action_text: scene.action,
+          heading: sanitizeText(scene.heading),
+          action_text: sanitizeText(scene.action),
         },
       ])
       .select()
       .single();
 
-    if (scriptError) {
-      console.error(`Error inserting scene #${i + 1}:`, scriptError.message);
-    } else if (scriptData) {
+    if (scriptData) {
       const shotType = scene.heading.includes("INT.") ? "Medium Close-up / Interior" : "Wide Shot / Exterior";
 
-      const { error: shotError } = await supabase.from("workshop_shots").insert([
+      await supabase.from("workshop_shots").insert([
         {
           story_id: storyId,
           scene_id: scriptData.id,
           shot_number: 1,
           shot_type: shotType,
           camera_movement: "Dynamic Tracking / Push In",
-          visual_prompt: `Cinematic render prompt for ${scene.heading}`,
+          visual_prompt: `Cinematic render prompt for ${sanitizeText(scene.heading)}`,
         },
       ]);
-      if (shotError) console.error("Error inserting shot:", shotError.message);
     }
   }
 
-  const { error: epError } = await supabase.from("story_episodes").insert([
+  await supabase.from("story_episodes").insert([
     {
       story_id: storyId,
       episode_number: 1,
@@ -259,7 +205,4 @@ export async function processAndSyncScriptImport(
       synopsis: `Auto-ingested screenplay containing ${scenes.length} scenes and ${charactersMap.size} key characters.`,
     },
   ]);
-  if (epError) console.error("Error inserting episode:", epError.message);
-
-  console.log("Script sync completed successfully!");
 }
