@@ -41,16 +41,22 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
     setIsSubmitting(true);
     setErrorMessage("");
-    setStatusMessage("Initializing project workspace...");
+    setStatusMessage("Authenticating session...");
 
     try {
-      // 1. Insert Project into Database
+      // 1. Get current authenticated user (bypasses RLS policy violations)
+      const { data: { user } } = await supabase.auth.getUser();
+
+      setStatusMessage("Initializing project workspace...");
+
+      // 2. Insert Project into Database with user_id if available
       const { data: projectData, error: projectError } = await supabase
         .from("projects")
         .insert([
           {
             title: title.trim(),
             description: description.trim() || "Autonomous screenplay workspace.",
+            ...(user ? { user_id: user.id } : {}), // Attach user ID if logged in
           },
         ])
         .select()
@@ -59,7 +65,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       if (projectError) throw projectError;
       const projectId = projectData.id;
 
-      // 2. Insert Default Story Record linked to Project
+      // 3. Insert Default Story Record linked to Project
       const { data: storyData, error: storyError } = await supabase
         .from("stories")
         .insert([
@@ -67,6 +73,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             project_id: projectId,
             title: title.trim(),
             premise: description.trim(),
+            ...(user ? { user_id: user.id } : {}),
           },
         ])
         .select()
@@ -77,7 +84,7 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
       }
       const storyId = storyData?.id || projectId;
 
-      // 3. Process & Sync File Upload if attached during creation
+      // 4. Process & Sync File Upload if attached during creation
       if (selectedFile) {
         setStatusMessage("Extracting text and running parser...");
         const rawText = await extractTextFromFile(selectedFile);
@@ -88,13 +95,13 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
       setStatusMessage("Finalizing synchronization...");
 
-      // 4. Reset Local State & Close Modal
+      // 5. Reset Local State & Close Modal
       setTitle("");
       setDescription("");
       setSelectedFile(null);
       onClose();
 
-      // 5. HARD REFRESH & INSTANT NAVIGATION
+      // 6. HARD REFRESH & INSTANT NAVIGATION
       router.refresh();
       router.push(`/workspace/${projectId}`);
     } catch (err: any) {
