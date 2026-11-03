@@ -26,7 +26,6 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
     if (file) {
       setSelectedFile(file);
       if (!title) {
-        // Auto-fill title from filename if title is empty
         const cleanName = file.name.replace(/\.[^/.]+$/, "").replace(/[-_]/g, " ");
         setTitle(cleanName.charAt(0).toUpperCase() + cleanName.slice(1));
       }
@@ -80,14 +79,14 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
       // 3. Process & Sync File Upload if attached during creation
       if (selectedFile) {
-        setStatusMessage("Extracting text and running AI/Regex parser...");
+        setStatusMessage("Extracting text and running parser...");
         const rawText = await extractTextFromFile(selectedFile);
         
-        setStatusMessage("Seeding screenplay, characters & shot workshops...");
+        setStatusMessage("Seeding screenplay & workshops...");
         await processAndSyncScriptImport(projectId, storyId, selectedFile, rawText);
       }
 
-      setStatusMessage("Finalizing workspace synchronization...");
+      setStatusMessage("Finalizing synchronization...");
 
       // 4. Reset Local State & Close Modal
       setTitle("");
@@ -109,15 +108,22 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <div className="w-full max-w-lg bg-[#0a0a0c] border border-zinc-800/90 rounded-2xl shadow-2xl p-6 flex flex-col gap-5 my-auto max-h-[92vh] overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-zinc-800/60 pb-4">
+      <div 
+        className="w-full max-w-lg rounded-[18px] p-6 flex flex-col gap-5 my-auto max-h-[92vh] overflow-y-auto shadow-2xl"
+        style={{
+          background: "linear-gradient(145deg, #1d1d1a, #171715)",
+          border: "1px solid var(--line)"
+        }}
+      >
+        <div className="flex items-center justify-between border-b border-[#2b2a27] pb-4">
           <div>
             <h2 className="text-xl font-bold text-white tracking-wide">Create StudioFlow Project</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">Autonomous screenplay ingestion & creative workshop</p>
+            <p className="text-xs muted mt-0.5">Autonomous screenplay ingestion & creative workshop</p>
           </div>
           <button 
+            type="button"
             onClick={onClose}
-            className="text-zinc-400 hover:text-white text-sm font-semibold p-1.5 rounded-xl hover:bg-zinc-800/60 transition-colors"
+            className="text-[#a5a39c] hover:text-white text-sm font-semibold p-1.5 rounded-xl hover:bg-[#29251f] transition-colors"
           >
             ✕
           </button>
@@ -131,35 +137,35 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Project Title</label>
+            <label className="mini-label">Project Title</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="e.g., Cyberpunk Chase Pilot"
               required
-              className="px-4 py-3 bg-zinc-950 border border-zinc-800/80 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors"
+              className="px-4 py-3 bg-[#111110] border border-[#2b2a27] rounded-[11px] text-white text-sm focus:outline-none focus:border-[#f08a4b] transition-colors"
             />
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">Description / Premise</label>
+            <label className="mini-label">Description / Premise</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Brief narrative overview..."
               rows={2}
-              className="px-4 py-3 bg-zinc-950 border border-zinc-800/80 rounded-xl text-white text-sm focus:outline-none focus:border-indigo-500 transition-colors resize-none"
+              className="px-4 py-3 bg-[#111110] border border-[#2b2a27] rounded-[11px] text-white text-sm focus:outline-none focus:border-[#f08a4b] transition-colors resize-none"
             />
           </div>
 
-          {/* INLINE SCRIPT UPLOAD SECTION */}
+          {/* SCRIPT UPLOAD SECTION */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-              Upload Screenplay <span className="text-zinc-500 font-normal">(Optional)</span>
+            <label className="mini-label">
+              Upload Screenplay <span className="text-[#a5a39c] font-normal lowercase">(Optional)</span>
             </label>
-            <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-zinc-800 bg-zinc-950/50 hover:border-indigo-500/50 rounded-xl cursor-pointer transition-all group">
-              <span className="text-xs font-medium text-zinc-300 group-hover:text-indigo-400 transition-colors text-center truncate max-w-full px-2">
+            <label className="flex flex-col items-center justify-center p-4 border-2 border-dashed border-[#2b2a27] bg-[#111110]/50 hover:border-[#f08a4b]/50 rounded-[11px] cursor-pointer transition-all group">
+              <span className="text-xs font-medium text-[#a5a39c] group-hover:text-[#f08a4b] transition-colors text-center truncate max-w-full px-2">
                 {selectedFile ? `📄 ${selectedFile.name}` : "Click to select .pdf, .docx, .txt, or .fountain file"}
               </span>
               <input 
@@ -171,23 +177,23 @@ export default function CreateProjectModal({ isOpen, onClose }: CreateProjectMod
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-zinc-800/60">
+          <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#2b2a27]">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4.5 py-2.5 bg-zinc-800/60 hover:bg-zinc-800 text-zinc-300 text-sm font-medium rounded-xl transition-colors"
+              className="ghost-button"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-xl transition-colors shadow-lg shadow-indigo-600/20 disabled:opacity-50 flex items-center justify-center min-w-[140px]"
+              className="action-button flex items-center justify-center min-w-[140px]"
             >
               {isSubmitting ? (
                 <span className="flex items-center gap-2">
-                  <span className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                  <span className="w-4 h-4 border-2 border-[#20150f]/20 border-t-[#20150f] rounded-full animate-spin" />
                   <span className="text-xs truncate max-w-[100px]">{statusMessage || "Processing..."}</span>
                 </span>
               ) : (
