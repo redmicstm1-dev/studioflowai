@@ -104,7 +104,7 @@ export default function CreateProjectModal({
 
       // 4. AUTOMATIC UI REFRESH & INSTANT WORKSPACE REDIRECTION
       router.refresh();
-      router.push(`/projects/${projectData.id}`);
+      router.push(`/workspace/projects/${projectData.id}`);
 if (!projectData?.id) {
   throw new Error("Project created, but no ID was returned.");
 }
