@@ -129,7 +129,7 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
       ${rawText.slice(0, 15000)}
     `;
 
-    const response = await fetch(`https://${RAPIDAPI_HOST}/v1/chat/completions`, {
+    const response = await fetch(`https://${RAPIDAPI_HOST}/v1/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
