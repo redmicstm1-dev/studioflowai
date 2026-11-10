@@ -107,41 +107,98 @@ function analyzeCinematicElements(actionText: string, sceneHeading: string) {
 
 /**
  * 3. LLM SEMANTIC FALLBACK PARSER ROUTINE (Non-blocking)
+ * Updated to use direct RapidAPI OpenAI proxy integration safely
  */
 async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ scenes: ParsedScene[]; characters: Map<string, ParsedCharacter>; sfxCues: string[] } | null> {
+  const RAPIDAPI_KEY = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
+  const RAPIDAPI_HOST = process.env.NEXT_PUBLIC_RAPIDAPI_HOST || "cheapest-gpt-4-turbo-gpt-4-vision-chatgpt-openai-ai-api.p.rapidapi.com";
+
+  if (!RAPIDAPI_KEY) {
+    console.warn("RapidAPI Key is missing. LLM semantic fallback bypassed.");
+    return null;
+  }
+
   try {
-    const response = await fetch("/api/parse-script-llm", {
+    const prompt = `
+      Analyze the following screenplay text and extract the data into a valid JSON object with these exact keys:
+      1. "scenes": An array of objects matching the ParsedScene interface (sceneNumber, heading, action, dialogue[], shotType, cameraMovement, visualPrompt).
+      2. "characters": An array of objects matching the ParsedCharacter interface (name, role, occurrences, dialogueSample).
+      3. "sfxCues": An array of strings representing sound effects mentioned.
+
+      Script Text:
+      ${rawText.slice(0, 15000)}
+    `;
+
+    const response = await fetch(`https://${RAPIDAPI_HOST}/v1/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ scriptText: rawText.slice(0, 15000) }),
+      headers: {
+        "Content-Type": "application/json",
+        "x-rapidapi-key": RAPIDAPI_KEY,
+        "x-rapidapi-host": RAPIDAPI_HOST,
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          { role: "system", content: "You are a professional script analyzer. Output strictly valid JSON without conversational markdown wrappers or filler text." },
+          { role: "user", content: prompt }
+        ],
+        temperature: 0.2
+      }),
     });
 
-    if (!response.ok) return null;
-    const data = await response.json();
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error(`RapidAPI Error (${response.status}):`, errorData);
+      return null;
+    }
 
-    const scenes: ParsedScene[] = (data.scenes || []).map((s: any, idx: number) => ({
+    const result = await response.json();
+    
+    // Safely extract content across different RapidAPI wrapper response schemas
+    const rawContent = 
+      result?.choices?.[0]?.message?.content || 
+      result?.response || 
+      result?.content || 
+      "{}";
+
+    // Strip markdown code fences robustly
+    const cleanedContent = rawContent
+      .replace(/```json\s*([\s\S]*?)\s*```/g, "$1")
+      .replace(/```([\s\S]*?)```/g, "$1")
+      .trim();
+
+    const parsedData = JSON.parse(cleanedContent);
+
+    const scenes: ParsedScene[] = (Array.isArray(parsedData.scenes) ? parsedData.scenes : []).map((s: any, idx: number) => ({
       sceneNumber: idx + 1,
       heading: s.heading || "EXT. SCENE - DAY",
       action: s.action || "",
-      dialogue: s.dialogue || [],
+      dialogue: Array.isArray(s.dialogue) ? s.dialogue : [],
       shotType: s.shotType || "Wide Shot",
       cameraMovement: s.cameraMovement || "Static",
-      visualPrompt: s.visualPrompt || `Cinematic visual for ${s.heading}`,
+      visualPrompt: s.visualPrompt || `Cinematic visual for ${s.heading || "Scene"}`,
     }));
 
     const charactersMap = new Map<string, ParsedCharacter>();
-    (data.characters || []).forEach((c: any) => {
-      charactersMap.set(c.name, {
-        name: c.name,
-        role: c.role || "Supporting",
-        occurrences: c.occurrences || 1,
-        dialogueSample: c.dialogueSample || "Dialogue reference.",
-      });
+    const rawChars = Array.isArray(parsedData.characters) ? parsedData.characters : [];
+    rawChars.forEach((c: any) => {
+      if (c && c.name) {
+        charactersMap.set(c.name, {
+          name: c.name,
+          role: c.role || "Supporting",
+          occurrences: c.occurrences || 1,
+          dialogueSample: c.dialogueSample || "Dialogue reference.",
+        });
+      }
     });
 
-    return { scenes, characters: charactersMap, sfxCues: data.sfxCues || [] };
+    return { 
+      scenes, 
+      characters: charactersMap, 
+      sfxCues: Array.isArray(parsedData.sfxCues) ? parsedData.sfxCues : [] 
+    };
   } catch (err) {
-    console.warn("LLM Semantic Fallback bypassed:", err);
+    console.warn("LLM Semantic Fallback Error:", err);
     return null;
   }
 }
