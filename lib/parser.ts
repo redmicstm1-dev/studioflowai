@@ -18,14 +18,15 @@ export interface ParsedCharacter {
 }
 
 /**
- * 1. UNIVERSAL FILE TEXT EXTRACTION (Crash-proof)
+ * 1. UNIVERSAL FILE TEXT EXTRACTION (Crash-proof & Binary Protected)
  */
 export async function extractTextFromFile(file: File): Promise<string> {
   if (!file) return "";
   const fileName = file.name.toLowerCase();
 
   if (fileName.endsWith(".txt") || fileName.endsWith(".fountain")) {
-    return await file.text();
+    const text = await file.text();
+    return isBinaryText(text) ? "EXT. DEFAULT SCENE - DAY\n\nUploaded file contained raw binary data." : text;
   }
 
   if (fileName.endsWith(".docx")) {
@@ -33,7 +34,9 @@ export async function extractTextFromFile(file: File): Promise<string> {
       const mammoth = await import("mammoth");
       const arrayBuffer = await file.arrayBuffer();
       const result = await mammoth.extractRawText({ arrayBuffer });
-      if (result.value && result.value.trim().length > 0) return result.value;
+      if (result.value && result.value.trim().length > 0) {
+        return result.value;
+      }
     } catch (err) {
       console.warn("Mammoth DOCX parsing failed:", err);
     }
@@ -60,17 +63,33 @@ export async function extractTextFromFile(file: File): Promise<string> {
         extractedPdfText += pageItems.map((item) => item.str || "").join(" ") + "\n\n";
       }
 
-      if (extractedPdfText.trim().length > 0) return extractedPdfText;
+      // Check if extracted text is valid readable content rather than raw binary garbage
+      if (extractedPdfText.trim().length > 50 && !isBinaryText(extractedPdfText)) {
+        return extractedPdfText;
+      }
     } catch (err) {
-      console.warn("PDFjs fallback active:", err);
+      console.warn("PDFjs parsing error:", err);
     }
   }
 
   try {
-    return await file.text();
+    const fallbackText = await file.text();
+    if (!isBinaryText(fallbackText)) {
+      return fallbackText;
+    }
   } catch {
-    return "EXT. DEFAULT SCENE - DAY\n\nFallback content extracted.";
+    // Ignore fallback failure
   }
+
+  // Safe fallback if PDF text extraction fails or returns binary stream bytes
+  return `EXT. IMPORTED SCRIPT - DAY\n\nFile: ${file.name}\n\n[Note: Automated text extraction could not parse this PDF text layer directly. Please use a clean .txt or .fountain export for full automated workshop parsing, or edit this scene manually.]`;
+}
+
+// Helper to detect if string is raw binary/PDF object stream code
+function isBinaryText(text: string): boolean {
+  if (!text) return false;
+  const sample = text.trim().slice(0, 200);
+  return sample.startsWith("%PDF") || sample.includes("obj <<") || sample.includes("endobj") || sample.includes("/Font");
 }
 
 // --- SANITIZATION UTILITIES ---
@@ -107,7 +126,7 @@ function analyzeCinematicElements(actionText: string, sceneHeading: string) {
 
 /**
  * 3. LLM SEMANTIC FALLBACK PARSER ROUTINE (Non-blocking)
- * Updated to use direct RapidAPI OpenAI proxy integration safely
+ * Updated to use direct RapidAPI OpenAI proxy integration safely with error resilience
  */
 async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ scenes: ParsedScene[]; characters: Map<string, ParsedCharacter>; sfxCues: string[] } | null> {
   const RAPIDAPI_KEY = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
@@ -147,8 +166,7 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error(`RapidAPI Error (${response.status}):`, errorData);
+      console.warn(`RapidAPI Error (${response.status}). Bypassing semantic fallback and utilizing primary regex engine.`);
       return null;
     }
 
