@@ -18,7 +18,7 @@ export interface ParsedCharacter {
 }
 
 /**
- * 1. UNIVERSAL FILE TEXT EXTRACTION (Crash-proof & Binary Protected)
+ * 1. UNIVERSAL FILE TEXT EXTRACTION (Crash-proof & Binary Protected / Mobile-Safe)
  */
 export async function extractTextFromFile(file: File): Promise<string> {
   if (!file) return "";
@@ -45,14 +45,14 @@ export async function extractTextFromFile(file: File): Promise<string> {
   if (fileName.endsWith(".pdf")) {
     try {
       const pdfjsLib = await import("pdfjs-dist");
-      try {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
-      } catch (workerErr) {
-        console.warn("Worker assignment skipped:", workerErr);
+      
+      // Disable worker requirement for mobile browser safety
+      if (pdfjsLib.GlobalWorkerOptions) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "";
       }
 
       const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any);
       const pdf = await loadingTask.promise;
 
       let extractedPdfText = "";
@@ -64,25 +64,25 @@ export async function extractTextFromFile(file: File): Promise<string> {
       }
 
       // Check if extracted text is valid readable content rather than raw binary garbage
-      if (extractedPdfText.trim().length > 50 && !isBinaryText(extractedPdfText)) {
+      if (extractedPdfText.trim().length > 20 && !isBinaryText(extractedPdfText)) {
         return extractedPdfText;
       }
     } catch (err) {
-      console.warn("PDFjs parsing error:", err);
+      console.warn("PDFjs fallback parsing active:", err);
     }
   }
 
   try {
     const fallbackText = await file.text();
-    if (!isBinaryText(fallbackText)) {
+    if (fallbackText && !isBinaryText(fallbackText)) {
       return fallbackText;
     }
   } catch {
     // Ignore fallback failure
   }
 
-  // Safe fallback if PDF text extraction fails or returns binary stream bytes
-  return `EXT. IMPORTED SCRIPT - DAY\n\nFile: ${file.name}\n\n[Note: Automated text extraction could not parse this PDF text layer directly. Please use a clean .txt or .fountain export for full automated workshop parsing, or edit this scene manually.]`;
+  // Safe fallback placeholder text so Supabase never receives invalid binary stream bytes
+  return `EXT. IMPORTED SCRIPT WORKSPACE - DAY\n\nFile Name: ${file.name}\n\n[Note: Automated text extraction could not read this PDF layout directly on mobile. Scene initialized successfully for manual editing.]`;
 }
 
 // Helper to detect if string is raw binary/PDF object stream code
@@ -94,8 +94,8 @@ function isBinaryText(text: string): boolean {
 
 // --- SANITIZATION UTILITIES ---
 function sanitizeText(text: string): string {
-  if (!text) return "";
-  return text.replace(/[\x00-\x1F\x7F]/g, " ").replace(/\\/g, "/").trim();
+  if (!text) return "Default content";
+  return text.replace(/[\x00-\x1F\x7F]/g, " ").replace(/\\/g, "/").trim() || "Default text";
 }
 
 function sanitizeFilename(filename: string): string {
@@ -126,14 +126,14 @@ function analyzeCinematicElements(actionText: string, sceneHeading: string) {
 
 /**
  * 3. LLM SEMANTIC FALLBACK PARSER ROUTINE (Non-blocking)
- * Updated to use direct RapidAPI OpenAI proxy integration safely with error resilience
+ * Powered by Google AI Studio Gemini API (OpenAI-compatible free endpoint)
  */
 async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ scenes: ParsedScene[]; characters: Map<string, ParsedCharacter>; sfxCues: string[] } | null> {
-  const RAPIDAPI_KEY = process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
-  const RAPIDAPI_HOST = process.env.NEXT_PUBLIC_RAPIDAPI_HOST || "cheapest-gpt-4-turbo-gpt-4-vision-chatgpt-openai-ai-api.p.rapidapi.com";
+  const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_RAPIDAPI_KEY;
+  const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai";
 
-  if (!RAPIDAPI_KEY) {
-    console.warn("RapidAPI Key is missing. LLM semantic fallback bypassed.");
+  if (!GEMINI_API_KEY) {
+    console.warn("Gemini/AI API Key is missing. LLM semantic fallback bypassed.");
     return null;
   }
 
@@ -148,15 +148,14 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
       ${rawText.slice(0, 15000)}
     `;
 
-    const response = await fetch(`https://${RAPIDAPI_HOST}/v1/chat`, {
+    const response = await fetch(`${GEMINI_BASE_URL}/chat/completions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-rapidapi-key": RAPIDAPI_KEY,
-        "x-rapidapi-host": RAPIDAPI_HOST,
+        "Authorization": `Bearer ${GEMINI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gpt-4o",
+        model: "gemini-2.5-flash",
         messages: [
           { role: "system", content: "You are a professional script analyzer. Output strictly valid JSON without conversational markdown wrappers or filler text." },
           { role: "user", content: prompt }
@@ -166,13 +165,14 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
     });
 
     if (!response.ok) {
-      console.warn(`RapidAPI Error (${response.status}). Bypassing semantic fallback and utilizing primary regex engine.`);
+      const errorData = await response.text();
+      console.error(`Gemini API Error (${response.status}):`, errorData);
       return null;
     }
 
     const result = await response.json();
     
-    // Safely extract content across different RapidAPI wrapper response schemas
+    // Safely extract content across different response schemas
     const rawContent = 
       result?.choices?.[0]?.message?.content || 
       result?.response || 
