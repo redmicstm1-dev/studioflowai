@@ -7,7 +7,7 @@ import Button from "@/components/ui/Button";
 import Inputs from "@/components/ui/Inputs";
 import { supabase } from "@/lib/supabase";
 import { Project } from "@/types/project";
-import { extractTextFromFile, processAndSyncScriptImport } from "@/lib/parser";
+import { extractTextFromFile, processAndSyncScriptImport, initializeEmptyProjectStory } from "@/lib/parser";
 
 interface CreateProjectModalProps {
   isOpen: boolean;
@@ -62,38 +62,23 @@ export default function CreateProjectModal({
         throw new Error(projectError?.message || "Project creation failed.");
       }
 
-      // 2. Initialize Default Story Entry inside Story Studio
-      const { data: storyData, error: storyError } = await supabase
-        .from("project_stories")
-        .insert([
-          {
-            project_id: projectData.id,
-            title: `${projectData.title} - Main Narrative`,
-            logline: scriptFile
-              ? "Generated from imported script text."
-              : "Initial story workstation concept.",
-            genre: "Drama",
-          },
-        ])
-        .select()
-        .single();
+      // 2. Initialize Default Story Entry ID
+      const storyId = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
 
-      if (storyError || !storyData) {
-        throw new Error("Failed to initialize story workspace.");
-      }
-
-      // 3. Extract Script & Auto-Sync across all 4 Workshops (If Script Attached)
       if (scriptFile) {
         setStatusText("Extracting raw screenplay text...");
         const rawText = await extractTextFromFile(scriptFile);
 
-        setStatusText("Syncing data to Story, Shot, Voice & Asset Library...");
+        setStatusText("Parsing & syncing script across workstation tabs...");
         await processAndSyncScriptImport(
           projectData.id,
-          storyData.id,
+          storyId,
           scriptFile,
           rawText
         );
+      } else {
+        setStatusText("Initializing baseline workstation records...");
+        await initializeEmptyProjectStory(projectData.id, storyId, projectData.title);
       }
 
       setLoading(false);
@@ -102,12 +87,10 @@ export default function CreateProjectModal({
       setScriptFile(null);
       onClose();
 
-      // 4. AUTOMATIC UI REFRESH & INSTANT WORKSPACE REDIRECTION
+      // 3. AUTOMATIC UI REFRESH & INSTANT WORKSPACE REDIRECTION
       router.refresh();
-      router.push(`/workspace/projects/${projectData.id}`);
-if (!projectData?.id) {
-  throw new Error("Project created, but no ID was returned.");
-}
+      router.push(`/workspace/story-studio/${storyId}`);
+
     } catch (err: any) {
       setLoading(false);
       onError(err.message || "An unexpected error occurred during project creation.");
@@ -126,7 +109,7 @@ if (!projectData?.id) {
             <div className="mini-label mb-2">INTELLIGENT WORKSPACE SETUP</div>
             <h2 className="text-xl font-semibold text-white">Create New Project</h2>
             <p className="mt-1 text-sm text-[#9a968d]">
-              Optionally upload a script to automatically extract characters, shots, voices, and assets.
+              Optionally upload a script to automatically extract characters, episodes, and continuity rules.
             </p>
           </div>
           <button
@@ -159,7 +142,7 @@ if (!projectData?.id) {
                 {scriptFile ? scriptFile.name : "Click to upload .txt, .fountain, or .pdf"}
               </div>
               <span className="text-[11px] text-[#77746d] text-center">
-                StudioFlow will parse and seed data directly across Story Studio, Shot Studio, Voice Studio, and the Asset Library.
+                StudioFlow will parse and seed data directly across all 5 workstation tabs.
               </span>
               <input
                 type="file"
