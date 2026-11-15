@@ -9,10 +9,13 @@ import {
   Film,
   FileText,
   ShieldAlert,
+  Upload,
+  Loader2,
 } from "lucide-react";
 
 import { supabase } from "@/lib/supabase";
 import Button from "@/components/ui/Button";
+import { extractTextFromFile, processAndSyncScriptImport } from "@/lib/parser";
 
 // Import all 5 tab components
 import OverviewTab from "./components/OverviewTab";
@@ -25,14 +28,21 @@ export default function StoryStudioWorkstation() {
   const router = useRouter();
   const routeParams = useParams();
 
-  const storyId = (routeParams?.id as string) || (routeParams?.storyId as string);
+  // Corrected parameter lookup to match [storyid] folder structure
+  const storyId =
+    (routeParams?.storyid as string) ||
+    (routeParams?.id as string) ||
+    (routeParams?.storyId as string);
 
   const [loading, setLoading] = useState(true);
+  const [isImporting, setIsImporting] = useState(false);
   const [story, setStory] = useState<any | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "characters" | "episodes" | "scripts" | "continuity">("overview");
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "characters" | "episodes" | "scripts" | "continuity"
+  >("overview");
   const [notice, setNotice] = useState("");
 
-  useEffect(() => {
+  const fetchStory = async () => {
     if (!storyId) {
       setNotice("Story identifier missing from URL path.");
       setLoading(false);
@@ -45,33 +55,45 @@ export default function StoryStudioWorkstation() {
       return;
     }
 
+    setLoading(true);
+    const { data, error } = await supabase
+      .from("project_stories")
+      .select("*, projects(title)")
+      .eq("id", storyId)
+      .single();
+
+    if (error || !data) {
+      setNotice(error ? error.message : "Story record not found in database.");
+    } else {
+      setStory(data);
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
     let mounted = true;
-
-    const fetchStory = async () => {
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from("project_stories")
-        .select("*, projects(title)")
-        .eq("id", storyId)
-        .single();
-
-      if (!mounted) return;
-
-      if (error || !data) {
-        setNotice(error ? error.message : "Story record not found in database.");
-      } else {
-        setStory(data);
-      }
-      setLoading(false);
-    };
-
-    fetchStory();
-
+    if (mounted) fetchStory();
     return () => {
       mounted = false;
     };
   }, [storyId]);
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !story) return;
+
+    setIsImporting(true);
+    try {
+      const rawText = await extractTextFromFile(file);
+      await processAndSyncScriptImport(story.project_id, story.id, file, rawText);
+      // Refresh workstation data after successful parse
+      await fetchStory();
+    } catch (err) {
+      console.error("Script import error:", err);
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -102,7 +124,7 @@ export default function StoryStudioWorkstation() {
         <ArrowLeft size={16} /> Back to Project Workspace
       </button>
 
-      {/* Header Banner */}
+      {/* Header Banner with Script Upload Action */}
       <div className="mb-8 flex flex-col justify-between gap-4 md:flex-row md:items-end">
         <div>
           <div className="mb-2 flex items-center gap-2">
@@ -117,6 +139,27 @@ export default function StoryStudioWorkstation() {
             {story.title}
           </h1>
         </div>
+
+        <label className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#f2a36f] hover:bg-[#e0925e] text-[#22211e] text-xs font-semibold cursor-pointer transition shadow-sm">
+          {isImporting ? (
+            <>
+              <Loader2 size={15} className="animate-spin" />
+              <span>Parsing Script...</span>
+            </>
+          ) : (
+            <>
+              <Upload size={15} />
+              <span>Import Script (.txt / .pdf / .docx)</span>
+            </>
+          )}
+          <input
+            type="file"
+            accept=".txt,.fountain,.pdf,.docx"
+            onChange={handleFileUpload}
+            disabled={isImporting}
+            className="hidden"
+          />
+        </label>
       </div>
 
       {/* Navigation Tabs */}
