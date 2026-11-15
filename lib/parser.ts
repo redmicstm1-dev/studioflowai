@@ -19,6 +19,36 @@ export async function extractTextFromFile(file: File): Promise<string> {
 }
 
 /**
+ * Initializes baseline records upon project creation so tabs never appear empty.
+ */
+export async function initializeEmptyProjectStory(projectId: string, storyId: string, title: string) {
+  if (!supabase) return;
+
+  try {
+    await supabase.from("project_stories").upsert({
+      id: storyId,
+      project_id: projectId,
+      title: title || "Untitled Production",
+      genre: "Action / Thriller",
+      logline: "New project initialized. Import a screenplay to populate your workstation.",
+      synopsis: "",
+      themes: ["Action", "Suspense"],
+    }, { onConflict: "id" });
+
+    await supabase.from("project_episodes").upsert({
+      story_id: storyId,
+      project_id: projectId,
+      episode_number: 1,
+      title: "Episode 1 — Pilot",
+      synopsis: "Initial episode workspace awaiting script ingestion.",
+      status: "draft",
+    }, { onConflict: "story_id,episode_number" });
+  } catch (err) {
+    console.warn("⚠️ Initial project seeding notice:", err);
+  }
+}
+
+/**
  * Intelligent local screenplay parser that extracts real character names,
  * distinct episodes, and unique continuity profiles from script text.
  */
@@ -26,17 +56,15 @@ function parseScriptLocally(projectId: string, storyId: string, rawText: string,
   const lines = rawText.split("\n").map(l => l.trim()).filter(Boolean);
   const titleLine = lines.find(l => l.length > 3 && l.length < 50) || fileName.replace(/\.[^/.]+$/, "");
 
-  // 1. Extract distinct character names from screenplay dialogue cues (ALL CAPS lines)
+  // Extract distinct character names from screenplay dialogue cues (ALL CAPS lines)
   const characterCounts: { [name: string]: number } = {};
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    // Screenplay speaker convention: short ALL CAPS line, not a slugline (INT/EXT)
     if (
       line === line.toUpperCase() &&
       line.length >= 2 &&
       line.length <= 20 &&
       !line.startsWith("INT.") &&
-      !line.export_name &&
       !line.startsWith("EXT.") &&
       !line.startsWith("CUT TO") &&
       !line.startsWith("FADE")
@@ -45,14 +73,12 @@ function parseScriptLocally(projectId: string, storyId: string, rawText: string,
     }
   }
 
-  // Sort by frequency of appearance to get primary characters
   const detectedNames = Object.keys(characterCounts)
     .sort((a, b) => characterCounts[b] - characterCounts[a])
     .slice(0, 5);
 
   const finalNames = detectedNames.length > 0 ? detectedNames : ["DAVID", "VICTOR", "MAYA", "DANIEL"];
 
-  // Build unique, differentiated character profiles
   const characters = finalNames.map((name, idx) => {
     const formattedName = name.charAt(0) + name.slice(1).toLowerCase();
     return {
@@ -68,7 +94,6 @@ function parseScriptLocally(projectId: string, storyId: string, rawText: string,
     };
   });
 
-  // Build unique continuity rules per character
   const continuity = characters.map((ch, idx) => ({
     project_id: projectId,
     story_id: storyId,
@@ -81,7 +106,6 @@ function parseScriptLocally(projectId: string, storyId: string, rawText: string,
     props_and_accessories: ["Secure comm-link", "Sidearm holster"],
   }));
 
-  // Extract episodes or generate structured default episodes
   const episodes = [
     {
       project_id: projectId,
@@ -194,16 +218,13 @@ export async function processAndSyncScriptImport(
     }
   }
 
-  // Fallback to intelligent local extraction
   if (!workspaceData) {
     workspaceData = parseScriptLocally(projectId, storyId, rawText, file.name);
   }
 
-  // SEED ALL 5 TABS INTO SUPABASE
   if (supabase) {
     console.log("💾 Seeding all 5 workstation tabs into Supabase database...");
     try {
-      // 1. Story Overview
       await supabase.from("project_stories").upsert({
         id: storyId,
         project_id: projectId,
@@ -214,7 +235,6 @@ export async function processAndSyncScriptImport(
         themes: workspaceData.story.themes || [],
       });
 
-      // 2. Episodes Tab
       if (workspaceData.episodes.length > 0) {
         for (const ep of workspaceData.episodes) {
           await supabase.from("project_episodes").upsert({
@@ -228,7 +248,6 @@ export async function processAndSyncScriptImport(
         }
       }
 
-      // 3. Characters Tab (Differentiated per character)
       if (workspaceData.characters.length > 0) {
         for (const char of workspaceData.characters) {
           await supabase.from("project_characters").upsert({
@@ -245,7 +264,6 @@ export async function processAndSyncScriptImport(
         }
       }
 
-      // 4. Continuity Tab (Unique rules per character)
       if (workspaceData.continuity.length > 0) {
         for (const cont of workspaceData.continuity) {
           await supabase.from("project_continuity").upsert({
@@ -262,7 +280,6 @@ export async function processAndSyncScriptImport(
         }
       }
 
-      // 5. Scripts Tab
       if (workspaceData.scripts.length > 0) {
         for (const scr of workspaceData.scripts) {
           await supabase.from("project_scripts").upsert({
