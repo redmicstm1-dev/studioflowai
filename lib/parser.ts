@@ -155,7 +155,7 @@ async function parseScriptWithLLMSemanticFallback(rawText: string): Promise<{ sc
         "Authorization": `Bearer ${GEMINI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: "gemini-2.5-flash",
+        model: "gemini-3.8-flash", // Updated to recommended active model
         messages: [
           { role: "system", content: "You are a professional script analyzer. Output strictly valid JSON without conversational markdown wrappers or filler text." },
           { role: "user", content: prompt }
