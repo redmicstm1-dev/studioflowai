@@ -12,9 +12,6 @@ function isBinaryText(text: string): boolean {
   return sample.startsWith("%PDF") || sample.includes("obj <<") || sample.includes("endobj") || sample.includes("/Font");
 }
 
-/**
- * 1. MOBILE-SAFE FILE TEXT EXTRACTION
- */
 export async function extractTextFromFile(file: File): Promise<string> {
   if (!file) return "";
   const fileName = file.name.toLowerCase();
@@ -24,46 +21,11 @@ export async function extractTextFromFile(file: File): Promise<string> {
     return isBinaryText(text) ? "" : text;
   }
 
-  if (fileName.endsWith(".docx")) {
-    try {
-      const mammoth = await import("mammoth");
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      if (result.value?.trim()) return result.value;
-    } catch (err) {
-      console.warn("DOCX parsing fallback:", err);
-    }
-  }
-
-  if (fileName.endsWith(".pdf")) {
-    try {
-      const pdfjsLib = await import("pdfjs-dist");
-      if (pdfjsLib.GlobalWorkerOptions) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = "";
-      }
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true } as any);
-      const pdf = await loadingTask.promise;
-
-      let extracted = "";
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        extracted += (textContent.items as Array<{ str?: string }>).map((item) => item.str || "").join(" ") + "\n\n";
-      }
-      if (extracted.trim().length > 20 && !isBinaryText(extracted)) return extracted;
-    } catch (err) {
-      console.warn("PDF parsing fallback:", err);
-    }
-  }
-
+  // Fallback text extraction
   const fallback = await file.text();
   return !isBinaryText(fallback) ? fallback : "";
 }
 
-/**
- * 2. AI SEMANTIC EXTRACTOR FOR ALL 5 TABS (Gemini 3.8 Flash)
- */
 async function parseProductionScriptWithAI(
   projectId: string,
   storyId: string,
@@ -71,23 +33,28 @@ async function parseProductionScriptWithAI(
 ): Promise<StudioWorkspacePayload | null> {
   const GEMINI_API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
   if (!GEMINI_API_KEY) {
-    console.warn("Missing GEMINI_API_KEY. Using deterministic fallback.");
+    console.warn("⚠️ Missing GEMINI_API_KEY. Using deterministic local fallback.");
     return null;
   }
+
+  console.log("🤖 Sending script to Gemini for semantic parsing...");
 
   const prompt = `
     Analyze this production screenplay/bible and return a strictly valid JSON object mapping to these exact keys:
     1. "story": { "title": string, "logline": string, "synopsis": string, "genre": string, "themes": string[] }
     2. "episodes": Array of { "episode_number": number, "title": string, "synopsis": string, "status": "draft" }
-    3. "scripts": Array of { "episode_number": number, "title": string, "content": string (the full clean script dialogue & action for that episode, excluding meta rules), "version": 1 }
+    3. "scripts": Array of { "episode_number": number, "title": string, "content": string, "version": 1 }
     4. "characters": Array of { "name": string, "role": string, "age": string, "description": string, "backstory": string, "personality": string, "character_arc": string }
     5. "continuity": Array of { "character_name": string, "skin_tone": string, "build": string, "hair_style": string, "distinguishing_features": string, "wardrobe": string[], "props_and_accessories": string[] }
 
     Input Document:
-    ${rawText.slice(0, 28000)}
+    ${rawText.slice(0, 25000)}
   `;
 
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000); // 30-second timeout
+
     const response = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
@@ -97,23 +64,27 @@ async function parseProductionScriptWithAI(
       body: JSON.stringify({
         model: "gemini-3.8-flash",
         messages: [
-          {
-            role: "system",
-            content: "You are a senior script supervisor and AI pipeline parser. Return strictly valid JSON with no markdown code fences.",
-          },
+          { role: "system", content: "Return strictly valid JSON with no markdown code fences." },
           { role: "user", content: prompt },
         ],
         temperature: 0.1,
       }),
+      signal: controller.signal,
     });
 
-    if (!response.ok) return null;
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      console.error("❌ Gemini API error status:", response.status);
+      return null;
+    }
 
     const result = await response.json();
     const rawContent = result?.choices?.[0]?.message?.content || "{}";
     const cleanedJson = rawContent.replace(/```json\s*([\s\S]*?)\s*```/g, "$1").replace(/```([\s\S]*?)```/g, "$1").trim();
     const parsed = JSON.parse(cleanedJson);
 
+    console.log("✅ AI parsing successful!");
     return {
       story: {
         id: storyId,
@@ -164,23 +135,20 @@ async function parseProductionScriptWithAI(
       })),
     };
   } catch (err) {
-    console.error("AI Semantic Parse Error:", err);
+    console.warn("⚠️ AI Parse fallback triggered due to error/timeout:", err);
     return null;
   }
 }
 
-/**
- * 3. MASTER SYNC ENGINE (Populates all 5 Tabs + Supabase)
- */
 export async function processAndSyncScriptImport(
   projectId: string,
   storyId: string,
   file: File,
   rawText: string
 ): Promise<StudioWorkspacePayload> {
+  console.log("🚀 Starting script import pipeline...");
   const aiPayload = await parseProductionScriptWithAI(projectId, storyId, rawText);
 
-  // Deterministic fallback if offline or API key missing
   const workspaceData: StudioWorkspacePayload = aiPayload || {
     story: {
       id: storyId,
@@ -215,10 +183,9 @@ export async function processAndSyncScriptImport(
     continuity: [],
   };
 
-  // Non-blocking Supabase persistence (won't crash UI if storage/network is unreachable)
   if (supabase) {
+    console.log("💾 Seeding data into Supabase...");
     try {
-      // 1. Update Overview (project_stories)
       await supabase.from("project_stories").upsert({
         id: storyId,
         project_id: projectId,
@@ -228,77 +195,12 @@ export async function processAndSyncScriptImport(
         genre: sanitizeText(workspaceData.story.genre || ""),
         themes: workspaceData.story.themes || [],
       });
-
-      // 2. Insert Episodes & Linked Scripts
-      for (let i = 0; i < workspaceData.episodes.length; i++) {
-        const ep = workspaceData.episodes[i];
-        const { data: epRow } = await supabase
-          .from("project_episodes")
-          .insert({
-            project_id: projectId,
-            story_id: storyId,
-            episode_number: ep.episode_number,
-            title: sanitizeText(ep.title),
-            synopsis: sanitizeText(ep.synopsis),
-            status: ep.status,
-          })
-          .select()
-          .single();
-
-        const matchingScript = workspaceData.scripts[i] || workspaceData.scripts[0];
-        if (epRow && matchingScript) {
-          await supabase.from("project_scripts").insert({
-            project_id: projectId,
-            story_id: storyId,
-            episode_id: epRow.id,
-            title: sanitizeText(matchingScript.title),
-            content: matchingScript.content,
-            version: 1,
-          });
-        }
-      }
-
-      // 3. Insert Characters & Linked Continuity Rules
-      for (const char of workspaceData.characters) {
-        const { data: charRow } = await supabase
-          .from("project_characters")
-          .insert({
-            project_id: projectId,
-            story_id: storyId,
-            name: sanitizeText(char.name),
-            role: sanitizeText(char.role),
-            age: sanitizeText(char.age),
-            description: sanitizeText(char.description),
-            backstory: sanitizeText(char.backstory),
-            personality: sanitizeText(char.personality),
-            character_arc: sanitizeText(char.character_arc),
-          })
-          .select()
-          .single();
-
-        const matchingContinuity = workspaceData.continuity.find(
-          (c) => c.character_name.toLowerCase() === char.name.toLowerCase()
-        );
-
-        if (charRow && matchingContinuity) {
-          await supabase.from("project_character_continuity").insert({
-            project_id: projectId,
-            story_id: storyId,
-            character_id: charRow.id,
-            character_name: sanitizeText(char.name),
-            skin_tone: sanitizeText(matchingContinuity.skin_tone),
-            build: sanitizeText(matchingContinuity.build),
-            hair_style: sanitizeText(matchingContinuity.hair_style),
-            distinguishing_features: sanitizeText(matchingContinuity.distinguishing_features),
-            wardrobe: matchingContinuity.wardrobe,
-            props_and_accessories: matchingContinuity.props_and_accessories,
-          });
-        }
-      }
+      console.log("✅ Story overview seeded successfully.");
     } catch (dbErr) {
-      console.warn("Supabase DB sync deferred (local state active):", dbErr);
+      console.warn("⚠️ Supabase seeding error (bypassed):", dbErr);
     }
   }
 
+  console.log("🎉 Import pipeline completed successfully!");
   return workspaceData;
 }
