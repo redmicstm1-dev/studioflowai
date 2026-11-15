@@ -35,14 +35,14 @@ export async function initializeEmptyProjectStory(projectId: string, storyId: st
       themes: ["Action", "Suspense"],
     }, { onConflict: "id" });
 
-    await supabase.from("project_episodes").upsert({
+    await supabase.from("project_episodes").insert({
       story_id: storyId,
       project_id: projectId,
       episode_number: 1,
       title: "Episode 1 — Pilot",
       synopsis: "Initial episode workspace awaiting script ingestion.",
       status: "draft",
-    }, { onConflict: "story_id,episode_number" });
+    });
   } catch (err) {
     console.warn("⚠️ Initial project seeding notice:", err);
   }
@@ -222,9 +222,11 @@ export async function processAndSyncScriptImport(
     workspaceData = parseScriptLocally(projectId, storyId, rawText, file.name);
   }
 
+  // PERSIST ALL 5 TABS TO SUPABASE DATABASE SAFELY
   if (supabase) {
     console.log("💾 Seeding all 5 workstation tabs into Supabase database...");
     try {
+      // 1. Story Overview Upsert
       await supabase.from("project_stories").upsert({
         id: storyId,
         project_id: projectId,
@@ -233,69 +235,73 @@ export async function processAndSyncScriptImport(
         synopsis: sanitizeText(workspaceData.story.synopsis || ""),
         genre: sanitizeText(workspaceData.story.genre || ""),
         themes: workspaceData.story.themes || [],
-      });
+      }, { onConflict: "id" });
 
+      // 2. Episodes: Clear existing and insert fresh
+      await supabase.from("project_episodes").delete().eq("story_id", storyId);
       if (workspaceData.episodes.length > 0) {
-        for (const ep of workspaceData.episodes) {
-          await supabase.from("project_episodes").upsert({
-            story_id: storyId,
-            project_id: projectId,
-            episode_number: ep.episode_number,
-            title: sanitizeText(ep.title),
-            synopsis: sanitizeText(ep.synopsis),
-            status: ep.status || "draft",
-          }, { onConflict: "story_id,episode_number" });
-        }
+        const episodesPayload = workspaceData.episodes.map(ep => ({
+          story_id: storyId,
+          project_id: projectId,
+          episode_number: ep.episode_number,
+          title: sanitizeText(ep.title),
+          synopsis: sanitizeText(ep.synopsis),
+          status: ep.status || "draft",
+        }));
+        await supabase.from("project_episodes").insert(episodesPayload);
       }
 
+      // 3. Characters: Clear existing and insert fresh
+      await supabase.from("project_characters").delete().eq("story_id", storyId);
       if (workspaceData.characters.length > 0) {
-        for (const char of workspaceData.characters) {
-          await supabase.from("project_characters").upsert({
-            story_id: storyId,
-            project_id: projectId,
-            name: sanitizeText(char.name),
-            role: sanitizeText(char.role),
-            age: sanitizeText(char.age),
-            description: sanitizeText(char.description),
-            backstory: sanitizeText(char.backstory),
-            personality: sanitizeText(char.personality),
-            character_arc: sanitizeText(char.character_arc),
-          }, { onConflict: "story_id,name" });
-        }
+        const charsPayload = workspaceData.characters.map(char => ({
+          story_id: storyId,
+          project_id: projectId,
+          name: sanitizeText(char.name),
+          role: sanitizeText(char.role),
+          age: sanitizeText(char.age),
+          description: sanitizeText(char.description),
+          backstory: sanitizeText(char.backstory),
+          personality: sanitizeText(char.personality),
+          character_arc: sanitizeText(char.character_arc),
+        }));
+        await supabase.from("project_characters").insert(charsPayload);
       }
 
+      // 4. Continuity: Clear existing and insert fresh
+      await supabase.from("project_continuity").delete().eq("story_id", storyId);
       if (workspaceData.continuity.length > 0) {
-        for (const cont of workspaceData.continuity) {
-          await supabase.from("project_continuity").upsert({
-            story_id: storyId,
-            project_id: projectId,
-            character_name: sanitizeText(cont.character_name),
-            skin_tone: sanitizeText(cont.skin_tone),
-            build: sanitizeText(cont.build),
-            hair_style: sanitizeText(cont.hair_style),
-            distinguishing_features: sanitizeText(cont.distinguishing_features),
-            wardrobe: cont.wardrobe || [],
-            props_and_accessories: cont.props_and_accessories || [],
-          }, { onConflict: "story_id,character_name" });
-        }
+        const contPayload = workspaceData.continuity.map(cont => ({
+          story_id: storyId,
+          project_id: projectId,
+          character_name: sanitizeText(cont.character_name),
+          skin_tone: sanitizeText(cont.skin_tone),
+          build: sanitizeText(cont.build),
+          hair_style: sanitizeText(cont.hair_style),
+          distinguishing_features: sanitizeText(cont.distinguishing_features),
+          wardrobe: cont.wardrobe || [],
+          props_and_accessories: cont.props_and_accessories || [],
+        }));
+        await supabase.from("project_continuity").insert(contPayload);
       }
 
+      // 5. Scripts: Clear existing and insert fresh
+      await supabase.from("project_scripts").delete().eq("story_id", storyId);
       if (workspaceData.scripts.length > 0) {
-        for (const scr of workspaceData.scripts) {
-          await supabase.from("project_scripts").upsert({
-            story_id: storyId,
-            project_id: projectId,
-            episode_id: scr.episode_id,
-            title: sanitizeText(scr.title),
-            content: scr.content,
-            version: scr.version || 1,
-          });
-        }
+        const scriptsPayload = workspaceData.scripts.map(scr => ({
+          story_id: storyId,
+          project_id: projectId,
+          episode_id: scr.episode_id,
+          title: sanitizeText(scr.title),
+          content: scr.content,
+          version: scr.version || 1,
+        }));
+        await supabase.from("project_scripts").insert(scriptsPayload);
       }
 
-      console.log("✅ All 5 workstation tabs seeded and synchronized successfully!");
+      console.log("✅ All 5 workstation tabs successfully seeded and persisted in Supabase!");
     } catch (dbErr) {
-      console.warn("⚠️ Supabase multi-table database seeding note:", dbErr);
+      console.warn("⚠️ Supabase database persistence error:", dbErr);
     }
   }
 
