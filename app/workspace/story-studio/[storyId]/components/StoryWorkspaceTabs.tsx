@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   BookOpen,
   Film,
@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { StudioWorkspacePayload } from "@/types/story";
 import { extractTextFromFile, processAndSyncScriptImport } from "@/lib/parser";
+import { supabase } from "@/lib/supabase";
 
 type TabKey = "overview" | "episodes" | "script" | "characters" | "continuity";
 
@@ -30,12 +31,13 @@ export default function StoryWorkspaceTabs({
   const [activeTab, setActiveTab] = useState<TabKey>("overview");
   const [isImporting, setIsImporting] = useState(false);
   const [selectedEpisodeIdx, setSelectedEpisodeIdx] = useState(0);
+  
   const [workspace, setWorkspace] = useState<StudioWorkspacePayload>(
     initialData || {
       story: {
         title: "Untitled Story",
         genre: "Action / Thriller",
-        logline: "Upload a screenplay to populate your workspace.",
+        logline: "Upload a screenplay or initialize project to populate your workspace.",
         synopsis: "",
         themes: [],
       },
@@ -45,6 +47,47 @@ export default function StoryWorkspaceTabs({
       continuity: [],
     }
   );
+
+  // Automatically fetch existing records from Supabase on mount / page refresh
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadWorkspaceFromSupabase() {
+      if (!supabase || !storyId) return;
+
+      try {
+        const [storyRes, epRes, charRes, contRes, scriptRes] = await Promise.all([
+          supabase.from("project_stories").select("*").eq("id", storyId).single(),
+          supabase.from("project_episodes").select("*").eq("story_id", storyId),
+          supabase.from("project_characters").select("*").eq("story_id", storyId),
+          supabase.from("project_continuity").select("*").eq("story_id", storyId),
+          supabase.from("project_scripts").select("*").eq("story_id", storyId),
+        ]);
+
+        if (!mounted) return;
+
+        if (storyRes.data) {
+          setWorkspace({
+            story: storyRes.data,
+            episodes: epRes.data || [],
+            characters: charRes.data || [],
+            continuity: contRes.data || [],
+            scripts: scriptRes.data || [],
+          });
+        }
+      } catch (err) {
+        console.warn("⚠️ Failed to load workspace data from Supabase:", err);
+      }
+    }
+
+    if (!initialData) {
+      loadWorkspaceFromSupabase();
+    }
+
+    return () => {
+      mounted = false;
+    };
+  }, [storyId, initialData]);
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
