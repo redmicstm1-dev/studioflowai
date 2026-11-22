@@ -40,7 +40,6 @@ import {
   assembleSequenceFromStudios,
   buildSrtSubtitles,
   fetchStoryVideoContext,
-  getAspectRatioDimensions,
   logVideoRenderToSupabase,
   renderSequenceToVideoBlob,
   saveVideoClipsToSupabase,
@@ -63,11 +62,26 @@ interface RenderedVideoExport {
   totalDurationSec: number;
 }
 
-function normalizeAspectRatio(value: unknown): VideoAspectRatio {
-  if (value === "9:16" || value === "1:1" || value === "16:9") {
-    return value;
-  }
+const LOCAL_RATIO_DIMENSIONS: Record<
+  VideoAspectRatio,
+  { width: number; height: number; label: string }
+> = {
+  "16:9": { width: 1280, height: 720, label: "16:9 Widescreen (1280×720)" },
+  "9:16": { width: 720, height: 1280, label: "9:16 Vertical Short (720×1280)" },
+  "1:1": { width: 1080, height: 1080, label: "1:1 Square Feed (1080×1080)" },
+};
+
+function normalizeRatio(value: unknown): VideoAspectRatio {
+  if (value === "9:16") return "9:16";
+  if (value === "1:1") return "1:1";
   return "16:9";
+}
+
+function getRatioDimensionsSafe(ratio: unknown) {
+  const normalized = normalizeRatio(ratio);
+  if (normalized === "9:16") return LOCAL_RATIO_DIMENSIONS["9:16"];
+  if (normalized === "1:1") return LOCAL_RATIO_DIMENSIONS["1:1"];
+  return LOCAL_RATIO_DIMENSIONS["16:9"];
 }
 
 function VideoStudioContent() {
@@ -82,8 +96,8 @@ function VideoStudioContent() {
   const [selectedStoryId, setSelectedStoryId] = useState(queryStoryId);
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("16:9");
 
-  const safeRatio = normalizeAspectRatio(aspectRatio);
-  const activeDimensions = getAspectRatioDimensions(safeRatio);
+  const safeRatio = normalizeRatio(aspectRatio);
+  const activeDimensions = getRatioDimensionsSafe(safeRatio);
 
   const [storyTitle, setStoryTitle] = useState("Story Workspace");
   const [episodes, setEpisodes] = useState<ProjectEpisode[]>([]);
@@ -119,7 +133,6 @@ function VideoStudioContent() {
     });
   }, []);
 
-  // Load projects and stories
   useEffect(() => {
     let mounted = true;
 
@@ -175,7 +188,6 @@ function VideoStudioContent() {
     }
   }, []);
 
-  // Automatically hydrate saved clips, renders, and upstream studio context on load/refresh
   const hydrateStoryVideo = useCallback(
     async (storyId: string) => {
       if (!storyId) {
@@ -335,17 +347,13 @@ function VideoStudioContent() {
   };
 
   const handleUpdateClip = (index: number, patch: Partial<VideoClipDraft>) => {
-    setClips((prev) =>
-      prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item))
-    );
+    setClips((prev) => prev.map((item, idx) => (idx === index ? { ...item, ...patch } : item)));
   };
 
   const handleDeleteClip = (index: number) => {
     stopSequencePreview();
     setClips((prev) =>
-      prev
-        .filter((_, idx) => idx !== index)
-        .map((item, idx) => ({ ...item, clip_order: idx + 1 }))
+      prev.filter((_, idx) => idx !== index).map((item, idx) => ({ ...item, clip_order: idx + 1 }))
     );
     setActiveClipIndex(0);
   };
@@ -603,7 +611,6 @@ function VideoStudioContent() {
 
   return (
     <div className="overflow-x-hidden">
-      {/* Header */}
       <div className="mb-8 flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
         <div className="min-w-0">
           <div className="mb-3 flex items-center gap-2 text-xs text-[#f2a36f]">
@@ -691,7 +698,6 @@ function VideoStudioContent() {
         </div>
       </div>
 
-      {/* Controls Bar: Project, Story & 3 Aspect Ratios */}
       <div className="panel mb-6 grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4 overflow-hidden">
         <div className="min-w-0">
           <label className="block text-[11px] font-medium uppercase tracking-wider text-[#8d8981] mb-1.5">
@@ -802,7 +808,6 @@ function VideoStudioContent() {
         </div>
       </div>
 
-      {/* Status Banner */}
       {statusMessage && (
         <div
           className={`mb-6 flex items-center gap-2.5 rounded-xl border px-4 py-3 text-xs sm:text-sm break-words ${
@@ -820,7 +825,6 @@ function VideoStudioContent() {
         </div>
       )}
 
-      {/* STAGED RENDERED VIDEO CARD — USER DECIDES WHEN TO DOWNLOAD */}
       {renderedExport && (
         <div className="panel mb-6 border-[#7fc7b2]/50 bg-[#151e1b] p-5 space-y-4 overflow-hidden">
           <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center border-b border-[#25332e] pb-3">
@@ -886,7 +890,6 @@ function VideoStudioContent() {
         </div>
       ) : (
         <div className="space-y-8">
-          {/* LIVE STAGE PREVIEW & STUDIO ALIGNMENT SUMMARY */}
           <div className="grid gap-6 lg:grid-cols-12 overflow-hidden">
             <div className="panel p-5 lg:col-span-7 space-y-4 overflow-hidden min-w-0">
               <div className="flex items-center justify-between gap-2 border-b border-[#252421] pb-3">
@@ -906,7 +909,9 @@ function VideoStudioContent() {
               </div>
 
               {activeClip ? (
-                <div className={`relative overflow-hidden rounded-xl border border-[#2f2e29] bg-[#0e0e0c] ${previewAspectClass}`}>
+                <div
+                  className={`relative overflow-hidden rounded-xl border border-[#2f2e29] bg-[#0e0e0c] ${previewAspectClass}`}
+                >
                   <img
                     src={
                       activeClip.image_url ||
@@ -928,8 +933,8 @@ function VideoStudioContent() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/50 flex flex-col justify-between p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-[#f2a36f] truncate">
-                      {storyTitle} • {(activeClip.transition_type || "ken_burns").replace("_", " ")} •{" "}
-                      {(Number(activeClip.duration_sec) || 4).toFixed(1)}s
+                      {storyTitle} • {(activeClip.transition_type || "ken_burns").replace("_", " ")}{" "}
+                      • {(Number(activeClip.duration_sec) || 4).toFixed(1)}s
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs sm:text-sm font-semibold text-white break-words">
@@ -938,7 +943,9 @@ function VideoStudioContent() {
                       {activeClip.dialogue_summary && (
                         <p className="rounded-lg bg-black/75 px-3 py-2 text-xs text-stone-100 break-words">
                           {activeClip.character_name ? (
-                            <span className="font-semibold text-[#7fc7b2]">{activeClip.character_name}: </span>
+                            <span className="font-semibold text-[#7fc7b2]">
+                              {activeClip.character_name}:{" "}
+                            </span>
                           ) : null}
                           &ldquo;{activeClip.dialogue_summary}&rdquo;
                         </p>
@@ -953,12 +960,9 @@ function VideoStudioContent() {
               )}
             </div>
 
-            {/* Upstream Studio Sync Status & Recent Renders */}
             <div className="panel p-5 lg:col-span-5 space-y-4 overflow-hidden min-w-0">
               <div className="flex items-center justify-between border-b border-[#252421] pb-3">
-                <h2 className="text-sm font-semibold text-white">
-                  Upstream Studio Alignment
-                </h2>
+                <h2 className="text-sm font-semibold text-white">Upstream Studio Alignment</h2>
                 {clips.length > 0 && (
                   <button
                     type="button"
@@ -1021,7 +1025,6 @@ function VideoStudioContent() {
             </div>
           </div>
 
-          {/* SEQUENCE TIMELINE CLIPS */}
           <section>
             <div className="mb-4 flex items-center justify-between gap-3">
               <div>
@@ -1046,7 +1049,9 @@ function VideoStudioContent() {
             {clips.length === 0 ? (
               <div className="panel p-8 text-center border-dashed">
                 <p className="text-xs text-[#8d8981]">
-                  No timeline clips yet. Click <span className="text-white font-medium">Assemble from Studios</span> or <span className="text-white font-medium">Add Clip</span>.
+                  No timeline clips yet. Click{" "}
+                  <span className="text-white font-medium">Assemble from Studios</span> or{" "}
+                  <span className="text-white font-medium">Add Clip</span>.
                 </p>
               </div>
             ) : (
