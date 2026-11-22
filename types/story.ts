@@ -41,6 +41,8 @@ export interface ProjectCharacterContinuity {
   updated_at: string;
 }
 
+export type EpisodeStatus = "draft" | "in_progress" | "completed";
+
 export interface ProjectEpisode {
   id: string;
   project_id: string;
@@ -48,7 +50,7 @@ export interface ProjectEpisode {
   episode_number: number;
   title: string;
   synopsis: string;
-  status: "draft" | "in_progress" | "completed";
+  status: EpisodeStatus;
   created_at: string;
   updated_at: string;
 }
@@ -65,10 +67,33 @@ export interface ProjectScript {
   updated_at: string;
 }
 
+export type ShotStatus = "planned" | "storyboarded" | "approved";
+
+export interface ProjectShot {
+  id: string;
+  project_id: string;
+  story_id: string;
+  episode_id?: string | null;
+  episode_number: number;
+  shot_number: number;
+  scene_heading: string;
+  camera_angle: string;
+  camera_movement: string;
+  lighting_mood: string;
+  visual_prompt: string;
+  continuity_notes: string;
+  status: ShotStatus | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type ShotDraft = Omit<ProjectShot, "id" | "created_at" | "updated_at">;
+
 export interface StudioWorkspacePayload {
   story: Partial<ProjectStory>;
   episodes: Omit<ProjectEpisode, "id" | "created_at" | "updated_at">[];
   scripts: Omit<ProjectScript, "id" | "created_at" | "updated_at">[];
   characters: Omit<ProjectCharacter, "id" | "created_at" | "updated_at">[];
   continuity: Omit<ProjectCharacterContinuity, "id" | "character_id" | "created_at" | "updated_at">[];
+  shots?: ShotDraft[];
 }
