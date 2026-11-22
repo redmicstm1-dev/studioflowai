@@ -89,6 +89,46 @@ export interface ProjectShot {
 
 export type ShotDraft = Omit<ProjectShot, "id" | "created_at" | "updated_at">;
 
+export type VoiceCastStatus = "cast" | "auditioning" | "locked";
+
+export interface ProjectVoice {
+  id: string;
+  project_id: string;
+  story_id: string;
+  character_id?: string | null;
+  character_name: string;
+  voice_uri: string;
+  voice_name: string;
+  lang: string;
+  pitch: number;
+  speaking_rate: number;
+  tone_direction: string;
+  sample_line: string;
+  status: VoiceCastStatus | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type VoiceDraft = Omit<ProjectVoice, "id" | "created_at" | "updated_at">;
+
+export type DialogueLineStatus = "ready" | "approved";
+
+export interface ProjectDialogueLine {
+  id: string;
+  project_id: string;
+  story_id: string;
+  episode_number: number;
+  line_number: number;
+  character_name: string;
+  parenthetical: string;
+  dialogue_text: string;
+  status: DialogueLineStatus | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type DialogueLineDraft = Omit<ProjectDialogueLine, "id" | "created_at" | "updated_at">;
+
 export interface StudioWorkspacePayload {
   story: Partial<ProjectStory>;
   episodes: Omit<ProjectEpisode, "id" | "created_at" | "updated_at">[];
@@ -96,4 +136,6 @@ export interface StudioWorkspacePayload {
   characters: Omit<ProjectCharacter, "id" | "created_at" | "updated_at">[];
   continuity: Omit<ProjectCharacterContinuity, "id" | "character_id" | "created_at" | "updated_at">[];
   shots?: ShotDraft[];
+  voices?: VoiceDraft[];
+  dialogueLines?: DialogueLineDraft[];
 }
