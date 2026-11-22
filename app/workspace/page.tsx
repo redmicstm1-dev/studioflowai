@@ -175,11 +175,7 @@ export default function WorkspaceOverviewPage() {
       <div className="mb-9 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
         <div className="panel overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#2b2a27] px-5 py-4 md:px-6">
-            <div>
-              <h2 className="font-semibold">Pick up where you left off</h2>
-              <p className="mt-1 text-xs text-[#8f8b83]">
-                Your creative work stored securely in Supabase.
-              </p>
+            
             </div>
           </div>
           <ProjectList
