@@ -129,6 +129,27 @@ export interface ProjectDialogueLine {
 
 export type DialogueLineDraft = Omit<ProjectDialogueLine, "id" | "created_at" | "updated_at">;
 
+export type AssetCategory = "location" | "prop" | "wardrobe" | "reference";
+export type AssetStatus = "draft" | "ready" | "locked";
+
+export interface ProjectAsset {
+  id: string;
+  project_id: string;
+  story_id: string;
+  category: AssetCategory | string;
+  name: string;
+  linked_entity: string;
+  episode_number: number;
+  description: string;
+  continuity_notes: string;
+  reference_url_or_prompt: string;
+  status: AssetStatus | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type AssetDraft = Omit<ProjectAsset, "id" | "created_at" | "updated_at">;
+
 export interface StudioWorkspacePayload {
   story: Partial<ProjectStory>;
   episodes: Omit<ProjectEpisode, "id" | "created_at" | "updated_at">[];
@@ -138,4 +159,5 @@ export interface StudioWorkspacePayload {
   shots?: ShotDraft[];
   voices?: VoiceDraft[];
   dialogueLines?: DialogueLineDraft[];
+  assets?: AssetDraft[];
 }
