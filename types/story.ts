@@ -158,6 +158,48 @@ export interface ProjectAsset {
 
 export type AssetDraft = Omit<ProjectAsset, "id" | "created_at" | "updated_at">;
 
+export type VideoAspectRatio = "16:9" | "9:16" | "1:1";
+export type VideoTransitionType = "cut" | "crossfade" | "ken_burns";
+export type VideoClipStatus = "draft" | "ready" | "approved";
+
+export interface ProjectVideoClip {
+  id: string;
+  project_id: string;
+  story_id: string;
+  episode_id?: string | null;
+  episode_number: number;
+  shot_number: number;
+  clip_order: number;
+  scene_heading: string;
+  character_name: string;
+  dialogue_summary: string;
+  visual_prompt: string;
+  continuity_notes: string;
+  image_url: string;
+  duration_sec: number;
+  transition_type: VideoTransitionType | string;
+  status: VideoClipStatus | string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export type VideoClipDraft = Omit<ProjectVideoClip, "id" | "created_at" | "updated_at">;
+
+export interface ProjectVideoRender {
+  id: string;
+  project_id: string;
+  story_id: string;
+  title: string;
+  aspect_ratio: VideoAspectRatio | string;
+  clip_count: number;
+  total_duration_sec: number;
+  export_format: string;
+  notes: string;
+  created_at?: string;
+}
+
+export type VideoRenderDraft = Omit<ProjectVideoRender, "id" | "created_at">;
+
 export interface StudioWorkspacePayload {
   story: Partial<ProjectStory>;
   episodes: Omit<ProjectEpisode, "id" | "created_at" | "updated_at">[];
@@ -168,4 +210,6 @@ export interface StudioWorkspacePayload {
   voices?: VoiceDraft[];
   dialogueLines?: DialogueLineDraft[];
   assets?: AssetDraft[];
+  videoClips?: VideoClipDraft[];
+  videoRenders?: VideoRenderDraft[];
 }
