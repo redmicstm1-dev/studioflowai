@@ -16,7 +16,6 @@ import {
 import { supabase } from "@/lib/supabase";
 import EditProjectModal from "@/components/workspace/EditProjectModal";
 import DeleteProjectModal from "@/components/workspace/DeleteProjectModal";
-import ProjectList from "@/components/workspace/ProjectList";
 import { Project } from "@/types/project";
 
 const tools = [
@@ -78,7 +77,6 @@ export default function WorkspaceOverviewPage() {
   const [projectList, setProjectList] = useState<Project[]>([]);
   const [productionElementsCount, setProductionElementsCount] = useState(0);
   const [voiceProfilesCount, setVoiceProfilesCount] = useState(0);
-  const [search] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -96,7 +94,10 @@ export default function WorkspaceOverviewPage() {
 
       const [projectsRes, shotsCount, assetsCount, clipsCount, voicesCount] =
         await Promise.all([
-          supabase!.from("projects").select("*").order("created_at", { ascending: false }),
+          supabase!
+            .from("projects")
+            .select("*")
+            .order("created_at", { ascending: false }),
           countTableRows("project_shots"),
           countTableRows("project_assets"),
           countTableRows("project_video_clips"),
@@ -123,102 +124,87 @@ export default function WorkspaceOverviewPage() {
   }, []);
 
   return (
-    <div>
+    <div className="min-w-0 overflow-x-hidden">
       <div className="mb-8 flex flex-col justify-between gap-5 md:flex-row md:items-end">
-        <div>
+        <div className="min-w-0">
           <div className="mb-3 flex items-center gap-2 text-xs text-[#aaa69d]">
-            <span className="h-1.5 w-1.5 rounded-full bg-[#7fc7a8]" /> YOUR WORKSPACE
+            <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#7fc7a8]" />{" "}
+            <span className="truncate">YOUR WORKSPACE</span>
           </div>
-          <h1 className="text-3xl font-semibold tracking-[-.04em] md:text-[38px]">
+          <h1 className="text-3xl font-semibold tracking-[-.04em] md:text-[38px] break-words">
             Dashboard Overview<span className="accent">.</span>
           </h1>
         </div>
       </div>
 
       {notice && (
-        <div className="mb-5 rounded-xl border border-[#3c5b4b] bg-[#1c2b23] px-4 py-3 text-sm text-[#a7dfc0]">
+        <div className="mb-5 rounded-xl border border-[#3c5b4b] bg-[#1c2b23] px-4 py-3 text-sm text-[#a7dfc0] break-words">
           {notice}
         </div>
       )}
 
       {/* Dynamic Stat Cards */}
       <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <div className="panel p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <span className="text-sm text-[#aaa69e]">Active projects</span>
-            <FolderOpen size={17} className="text-[#e7a170]" aria-hidden="true" />
+        <div className="panel min-w-0 p-5">
+          <div className="mb-5 flex items-center justify-between gap-2">
+            <span className="truncate text-sm text-[#aaa69e]">Active projects</span>
+            <FolderOpen size={17} className="shrink-0 text-[#e7a170]" aria-hidden="true" />
           </div>
-          <div className="stat-number">
+          <div className="stat-number truncate">
             {loadingProjects ? "..." : projectList.length.toString().padStart(2, "0")}
           </div>
         </div>
-        <div className="panel p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <span className="text-sm text-[#aaa69e]">Production elements</span>
-            <Clapperboard size={17} className="text-[#b5a1ff]" aria-hidden="true" />
+        <div className="panel min-w-0 p-5">
+          <div className="mb-5 flex items-center justify-between gap-2">
+            <span className="truncate text-sm text-[#aaa69e]">Production elements</span>
+            <Clapperboard size={17} className="shrink-0 text-[#b5a1ff]" aria-hidden="true" />
           </div>
-          <div className="stat-number">
-            {loadingMetrics ? "..." : productionElementsCount.toString().padStart(2, "0")}
+          <div className="stat-number truncate">
+            {loadingMetrics
+              ? "..."
+              : productionElementsCount.toString().padStart(2, "0")}
           </div>
         </div>
-        <div className="panel p-5">
-          <div className="mb-5 flex items-center justify-between">
-            <span className="text-sm text-[#aaa69e]">Voice profiles</span>
-            <Waves size={18} className="text-[#7fc7b2]" aria-hidden="true" />
+        <div className="panel min-w-0 p-5">
+          <div className="mb-5 flex items-center justify-between gap-2">
+            <span className="truncate text-sm text-[#aaa69e]">Voice profiles</span>
+            <Waves size={18} className="shrink-0 text-[#7fc7b2]" aria-hidden="true" />
           </div>
-          <div className="stat-number">
+          <div className="stat-number truncate">
             {loadingMetrics ? "..." : voiceProfilesCount.toString().padStart(2, "0")}
           </div>
         </div>
       </div>
 
-      <div className="mb-9 grid gap-6 xl:grid-cols-[1.55fr_1fr]">
-        <div className="panel overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[#2b2a27] px-5 py-4 md:px-6">
-            
-            </div>
+      {/* Toolkit Sub-route Navigation Cards */}
+      <div className="mb-9 panel relative overflow-hidden p-5 md:p-6">
+        <div className="relative min-w-0">
+          <div className="mb-5 flex items-center justify-between gap-2">
+            <span className="mini-label truncate">YOUR CREATIVE TOOLKIT</span>
+            <Sparkles size={17} className="accent shrink-0" aria-hidden="true" />
           </div>
-          <ProjectList
-            projects={projectList}
-            loading={loadingProjects}
-            search={search}
-            onSelectProject={(proj) => {
-              if (proj.id) {
-                router.push(`/workspace/projects/${proj.id}`);
-              }
-            }}
-            onEditProject={(proj) => setEditingProject(proj)}
-            onDeleteProject={(proj) => setDeletingProject(proj)}
-          />
-        </div>
-
-        {/* Toolkit Sub-route Navigation Cards */}
-        <div className="panel relative overflow-hidden p-5 md:p-6">
-          <div className="relative">
-            <div className="mb-5 flex items-center justify-between">
-              <span className="mini-label">YOUR CREATIVE TOOLKIT</span>
-              <Sparkles size={17} className="accent" aria-hidden="true" />
-            </div>
-            <div className="space-y-2">
-              {tools.map((tool) => (
-                <button
-                  key={tool.name}
-                  onClick={() => router.push(tool.route)}
-                  className="flex w-full items-center gap-3 rounded-xl border border-[#302f2a] bg-[#1b1b18]/80 p-3 text-left transition hover:border-[#51483c] hover:bg-[#23231f]"
+          <div className="space-y-2">
+            {tools.map((tool) => (
+              <button
+                key={tool.name}
+                type="button"
+                onClick={() => router.push(tool.route)}
+                className="flex w-full min-w-0 items-center gap-3 rounded-xl border border-[#302f2a] bg-[#1b1b18]/80 p-3 text-left transition hover:border-[#51483c] hover:bg-[#23231f]"
+              >
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+                  style={{ background: `${tool.color}18`, color: tool.color }}
                 >
-                  <div
-                    className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
-                    style={{ background: `${tool.color}18`, color: tool.color }}
-                  >
-                    <tool.icon size={19} aria-hidden="true" />
+                  <tool.icon size={19} aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{tool.name}</div>
+                  <div className="mt-1 truncate text-[11px] text-[#8e8a82]">
+                    {tool.desc}
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="text-sm font-medium">{tool.name}</div>
-                    <div className="mt-1 truncate text-[11px] text-[#8e8a82]">{tool.desc}</div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                </div>
+              </button>
+            ))}
           </div>
         </div>
       </div>
