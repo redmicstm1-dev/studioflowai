@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useRef } from "react";
+import React, { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Video,
@@ -37,10 +37,10 @@ import {
   VideoClipDraft,
 } from "@/types/story";
 import {
-  ASPECT_RATIO_DIMENSIONS,
   assembleSequenceFromStudios,
   buildSrtSubtitles,
   fetchStoryVideoContext,
+  getAspectRatioDimensions,
   logVideoRenderToSupabase,
   renderSequenceToVideoBlob,
   saveVideoClipsToSupabase,
@@ -63,17 +63,27 @@ interface RenderedVideoExport {
   totalDurationSec: number;
 }
 
-export default function VideoStudioPage() {
+function normalizeAspectRatio(value: unknown): VideoAspectRatio {
+  if (value === "9:16" || value === "1:1" || value === "16:9") {
+    return value;
+  }
+  return "16:9";
+}
+
+function VideoStudioContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const queryProjectId = searchParams.get("projectId") || "";
-  const queryStoryId = searchParams.get("storyId") || "";
+  const queryProjectId = searchParams?.get("projectId") || "";
+  const queryStoryId = searchParams?.get("storyId") || "";
 
   const [projects, setProjects] = useState<Project[]>([]);
   const [stories, setStories] = useState<StoryOption[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState(queryProjectId);
   const [selectedStoryId, setSelectedStoryId] = useState(queryStoryId);
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>("16:9");
+
+  const safeRatio = normalizeAspectRatio(aspectRatio);
+  const activeDimensions = getAspectRatioDimensions(safeRatio);
 
   const [storyTitle, setStoryTitle] = useState("Story Workspace");
   const [episodes, setEpisodes] = useState<ProjectEpisode[]>([]);
@@ -452,7 +462,6 @@ export default function VideoStudioPage() {
     return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
   };
 
-  // Render video in memory ONLY — user decides whether to download via the Download button
   const handleRenderSequence = async () => {
     if (clips.length === 0 || !selectedProjectId || !selectedStoryId) {
       setStatusMessage({ type: "error", text: "Add or assemble clips before rendering." });
@@ -462,16 +471,16 @@ export default function VideoStudioPage() {
     stopSequencePreview();
     clearRenderedExport();
     setRendering(true);
-    setRenderProgressText(`Preparing ${aspectRatio} canvas...`);
+    setRenderProgressText(`Preparing ${safeRatio} canvas...`);
     setStatusMessage(null);
 
     try {
       const { blob, extension, totalDurationSec } = await renderSequenceToVideoBlob({
         clips,
-        aspectRatio,
+        aspectRatio: safeRatio,
         storyTitle,
         onProgress: (cur, tot) => {
-          setRenderProgressText(`Rendering clip ${cur} of ${tot} (${aspectRatio})...`);
+          setRenderProgressText(`Rendering clip ${cur} of ${tot} (${safeRatio})...`);
         },
       });
 
@@ -480,7 +489,7 @@ export default function VideoStudioPage() {
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, "-")
           .replace(/(^-|-$)/g, "") || "studioflow-sequence";
-      const ratioTag = aspectRatio.replace(":", "x");
+      const ratioTag = safeRatio.replace(":", "x");
 
       let finalBlob: Blob;
       let finalExt: "mp4" | "webm" | "json";
@@ -495,8 +504,8 @@ export default function VideoStudioPage() {
         const manifest = JSON.stringify(
           {
             storyTitle,
-            aspectRatio,
-            dimensions: ASPECT_RATIO_DIMENSIONS[aspectRatio],
+            aspectRatio: safeRatio,
+            dimensions: activeDimensions,
             totalDurationSec,
             clips,
             subtitlesSrt: srt,
@@ -515,7 +524,7 @@ export default function VideoStudioPage() {
         objectUrl,
         filename,
         extension: finalExt,
-        aspectRatio,
+        aspectRatio: safeRatio,
         sizeLabel: formatBytes(finalBlob.size),
         clipCount: clips.length,
         totalDurationSec,
@@ -524,8 +533,8 @@ export default function VideoStudioPage() {
       const logged = await logVideoRenderToSupabase({
         project_id: selectedProjectId,
         story_id: selectedStoryId,
-        title: `${storyTitle} (${aspectRatio})`,
-        aspect_ratio: aspectRatio,
+        title: `${storyTitle} (${safeRatio})`,
+        aspect_ratio: safeRatio,
         clip_count: clips.length,
         total_duration_sec: totalDurationSec,
         export_format: finalExt,
@@ -549,7 +558,6 @@ export default function VideoStudioPage() {
     }
   };
 
-  // Explicit user-triggered download handlers
   const handleManualDownloadVideo = () => {
     if (!renderedExport) return;
     const a = document.createElement("a");
@@ -572,7 +580,7 @@ export default function VideoStudioPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${slug}-${aspectRatio.replace(":", "x")}.srt`;
+    a.download = `${slug}-${safeRatio.replace(":", "x")}.srt`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -587,9 +595,9 @@ export default function VideoStudioPage() {
   const totalDuration = clips.reduce((acc, c) => acc + (Number(c.duration_sec) || 4), 0);
 
   const previewAspectClass =
-    aspectRatio === "9:16"
+    safeRatio === "9:16"
       ? "aspect-[9/16] max-h-[420px] mx-auto"
-      : aspectRatio === "1:1"
+      : safeRatio === "1:1"
       ? "aspect-square max-h-[380px] mx-auto"
       : "aspect-video w-full";
 
@@ -656,7 +664,7 @@ export default function VideoStudioPage() {
             ) : (
               <Wand2 size={16} className="text-[#f2a36f]" />
             )}
-            <span>{rendering ? renderProgressText || "Rendering..." : `Render (${aspectRatio})`}</span>
+            <span>{rendering ? renderProgressText || "Rendering..." : `Render (${safeRatio})`}</span>
           </Button>
 
           {renderedExport && (
@@ -735,7 +743,7 @@ export default function VideoStudioPage() {
                   clearRenderedExport();
                 }}
                 className={`rounded-lg py-1.5 text-xs font-semibold transition ${
-                  aspectRatio === ratio
+                  safeRatio === ratio
                     ? "bg-[#f2a36f] text-[#141412]"
                     : "text-[#9a968d] hover:text-white"
                 }`}
@@ -884,7 +892,7 @@ export default function VideoStudioPage() {
               <div className="flex items-center justify-between gap-2 border-b border-[#252421] pb-3">
                 <div className="min-w-0">
                   <h2 className="text-sm font-semibold text-white truncate">
-                    Stage Monitor — {ASPECT_RATIO_DIMENSIONS[aspectRatio].label}
+                    Stage Monitor — {activeDimensions.label}
                   </h2>
                   <p className="text-[11px] text-[#8d8981]">
                     {clips.length} Clips • Est. {totalDuration.toFixed(1)}s total runtime
@@ -920,7 +928,8 @@ export default function VideoStudioPage() {
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/50 flex flex-col justify-between p-4">
                     <div className="text-[11px] font-semibold uppercase tracking-wider text-[#f2a36f] truncate">
-                      {storyTitle} • {activeClip.transition_type.replace("_", " ")} • {Number(activeClip.duration_sec).toFixed(1)}s
+                      {storyTitle} • {(activeClip.transition_type || "ken_burns").replace("_", " ")} •{" "}
+                      {(Number(activeClip.duration_sec) || 4).toFixed(1)}s
                     </div>
                     <div className="space-y-1">
                       <p className="text-xs sm:text-sm font-semibold text-white break-words">
@@ -1192,5 +1201,19 @@ export default function VideoStudioPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function VideoStudioPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#39342e] border-t-[#f2a36f]" />
+        </div>
+      }
+    >
+      <VideoStudioContent />
+    </Suspense>
   );
 }
