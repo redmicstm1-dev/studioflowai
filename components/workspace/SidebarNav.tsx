@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   AudioLines,
   BookOpen,
@@ -12,10 +12,9 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
-  Plus,
   Settings,
-  Sparkles,
   Users,
+  Video,
   X,
 } from "lucide-react";
 
@@ -33,13 +32,11 @@ interface SidebarNavProps {
 export default function SidebarNav({
   mobileNav,
   setMobileNav,
-  setShowCreate,
   userName,
   userEmail,
   onSignOut,
 }: SidebarNavProps) {
   const pathname = usePathname();
-  const router = useRouter();
 
   const navGroups = [
     {
@@ -55,8 +52,9 @@ export default function SidebarNav({
       items: [
         { name: "Story Studio", icon: BookOpen, href: "/workspace/story-studio" },
         { name: "Shot Studio", icon: Clapperboard, href: "/workspace/shot-studio" },
-        { name: "Voice Studio", icon: AudioLines, href: "/workspace/voice-studio", badge: "AI" },
+        { name: "Voice Studio", icon: AudioLines, href: "/workspace/voice-studio" },
         { name: "Asset Library", icon: Boxes, href: "/workspace/asset-library" },
+        { name: "Video Studio", icon: Video, href: "/workspace/video-studio", badge: "NEW" },
       ],
     },
     {
