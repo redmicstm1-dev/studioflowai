@@ -9,6 +9,7 @@ import {
   Clapperboard,
   FolderOpen,
   Sparkles,
+  Video,
   Waves,
 } from "lucide-react";
 
@@ -19,45 +20,102 @@ import ProjectList from "@/components/workspace/ProjectList";
 import { Project } from "@/types/project";
 
 const tools = [
-  { name: "Story Studio", desc: "Ideas, scripts & characters", icon: BookOpen, color: "#f2a36f", route: "/workspace/story-studio" },
-  { name: "Shot Studio", desc: "Scenes, shots & storyboards", icon: Clapperboard, color: "#b5a1ff", route: "/workspace/shot-studio" },
-  { name: "Voice Studio", desc: "Character voices & dialogue", icon: AudioLines, color: "#7fc7b2", route: "/workspace/voice-studio" },
-  { name: "Asset Library", desc: "References & continuity", icon: Boxes, color: "#e4c66e", route: "/workspace/asset-library" },
+  {
+    name: "Story Studio",
+    desc: "Ideas, scripts & characters",
+    icon: BookOpen,
+    color: "#f2a36f",
+    route: "/workspace/story-studio",
+  },
+  {
+    name: "Shot Studio",
+    desc: "Scenes, shots & storyboards",
+    icon: Clapperboard,
+    color: "#b5a1ff",
+    route: "/workspace/shot-studio",
+  },
+  {
+    name: "Voice Studio",
+    desc: "Character voices & dialogue",
+    icon: AudioLines,
+    color: "#7fc7b2",
+    route: "/workspace/voice-studio",
+  },
+  {
+    name: "Asset Library",
+    desc: "References & continuity",
+    icon: Boxes,
+    color: "#e4c66e",
+    route: "/workspace/asset-library",
+  },
+  {
+    name: "Video Studio",
+    desc: "Multi-ratio timeline & MP4 render",
+    icon: Video,
+    color: "#f08a4b",
+    route: "/workspace/video-studio",
+  },
 ];
+
+async function countTableRows(tableName: string): Promise<number> {
+  if (!supabase) return 0;
+  const { count, error } = await supabase
+    .from(tableName)
+    .select("*", { count: "exact", head: true });
+  if (error || typeof count !== "number") return 0;
+  return count;
+}
 
 export default function WorkspaceOverviewPage() {
   const router = useRouter();
   const [loadingProjects, setLoadingProjects] = useState(true);
+  const [loadingMetrics, setLoadingMetrics] = useState(true);
 
   // Modals state
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [deletingProject, setDeletingProject] = useState<Project | null>(null);
 
   const [projectList, setProjectList] = useState<Project[]>([]);
+  const [productionElementsCount, setProductionElementsCount] = useState(0);
+  const [voiceProfilesCount, setVoiceProfilesCount] = useState(0);
   const [search] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
-    if (!supabase) return;
+    if (!supabase) {
+      setLoadingProjects(false);
+      setLoadingMetrics(false);
+      return;
+    }
 
     let mounted = true;
 
-    const fetchProjects = async () => {
+    const fetchOverviewData = async () => {
       setLoadingProjects(true);
-      const { data: dbProjects, error } = await supabase!
-        .from("projects")
-        .select("*")
-        .order("created_at", { ascending: false });
+      setLoadingMetrics(true);
 
-      if (mounted) {
-        if (!error && dbProjects) {
-          setProjectList(dbProjects);
-        }
-        setLoadingProjects(false);
+      const [projectsRes, shotsCount, assetsCount, clipsCount, voicesCount] =
+        await Promise.all([
+          supabase!.from("projects").select("*").order("created_at", { ascending: false }),
+          countTableRows("project_shots"),
+          countTableRows("project_assets"),
+          countTableRows("project_video_clips"),
+          countTableRows("project_voices"),
+        ]);
+
+      if (!mounted) return;
+
+      if (!projectsRes.error && projectsRes.data) {
+        setProjectList(projectsRes.data);
       }
+      setProductionElementsCount(shotsCount + assetsCount + clipsCount);
+      setVoiceProfilesCount(voicesCount);
+
+      setLoadingProjects(false);
+      setLoadingMetrics(false);
     };
 
-    fetchProjects();
+    fetchOverviewData();
 
     return () => {
       mounted = false;
@@ -99,14 +157,18 @@ export default function WorkspaceOverviewPage() {
             <span className="text-sm text-[#aaa69e]">Production elements</span>
             <Clapperboard size={17} className="text-[#b5a1ff]" aria-hidden="true" />
           </div>
-          <div className="stat-number">00</div>
+          <div className="stat-number">
+            {loadingMetrics ? "..." : productionElementsCount.toString().padStart(2, "0")}
+          </div>
         </div>
         <div className="panel p-5">
           <div className="mb-5 flex items-center justify-between">
             <span className="text-sm text-[#aaa69e]">Voice profiles</span>
             <Waves size={18} className="text-[#7fc7b2]" aria-hidden="true" />
           </div>
-          <div className="stat-number">00</div>
+          <div className="stat-number">
+            {loadingMetrics ? "..." : voiceProfilesCount.toString().padStart(2, "0")}
+          </div>
         </div>
       </div>
 
@@ -115,7 +177,9 @@ export default function WorkspaceOverviewPage() {
           <div className="flex items-center justify-between border-b border-[#2b2a27] px-5 py-4 md:px-6">
             <div>
               <h2 className="font-semibold">Pick up where you left off</h2>
-              <p className="mt-1 text-xs text-[#8f8b83]">Your creative work stored securely in Supabase.</p>
+              <p className="mt-1 text-xs text-[#8f8b83]">
+                Your creative work stored securely in Supabase.
+              </p>
             </div>
           </div>
           <ProjectList
@@ -189,4 +253,4 @@ export default function WorkspaceOverviewPage() {
       />
     </div>
   );
-} 
+}
