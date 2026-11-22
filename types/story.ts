@@ -129,7 +129,14 @@ export interface ProjectDialogueLine {
 
 export type DialogueLineDraft = Omit<ProjectDialogueLine, "id" | "created_at" | "updated_at">;
 
-export type AssetCategory = "location" | "prop" | "wardrobe" | "reference";
+export type AssetCategory =
+  | "character"
+  | "scene"
+  | "location"
+  | "prop"
+  | "wardrobe"
+  | "reference";
+
 export type AssetStatus = "draft" | "ready" | "locked";
 
 export interface ProjectAsset {
@@ -143,6 +150,7 @@ export interface ProjectAsset {
   description: string;
   continuity_notes: string;
   reference_url_or_prompt: string;
+  image_url?: string;
   status: AssetStatus | string;
   created_at?: string;
   updated_at?: string;
